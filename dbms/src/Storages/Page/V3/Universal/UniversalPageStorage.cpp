@@ -187,6 +187,8 @@ UniversalPageMap UniversalPageStorage::read(const std::vector<PageReadFields> & 
         snapshot = this->getSnapshot("");
     }
 
+    Stopwatch w;
+
     // get the entries from directory, keep track
     // for not found page_ids
     UniversalPageIds page_ids_not_found;
@@ -214,16 +216,30 @@ UniversalPageMap UniversalPageStorage::read(const std::vector<PageReadFields> & 
         }
     }
 
+    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_ps_get_id).Observe(w.elapsedSeconds());
+    w.restart();
+
     // read page data from blob_store
     auto local_page_map = blob_store->read(local_read_infos, read_limiter);
+    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_ps_read_blob).Observe(w.elapsedSeconds());
+
+    w.restart();
     auto [page_map_for_update_cache, remote_page_map] = remote_reader->read(remote_read_infos);
+    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_ps_read_remote).Observe(w.elapsedSeconds());
+
+    w.restart();
     UniversalWriteBatch wb;
     for (const auto & [page_id, page] : page_map_for_update_cache)
     {
         auto buf = std::make_shared<ReadBufferFromMemory>(page.data.begin(), page.data.size());
         wb.updateRemotePage(page_id, buf, page.data.size());
     }
+    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_ps_update_remote).Observe(w.elapsedSeconds());
+
+    w.restart();
     tryUpdateLocalCacheForRemotePages(wb, snapshot);
+    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_ps_update_local).Observe(w.elapsedSeconds());
+
     for (const auto & [page_id, page] : remote_page_map)
     {
         local_page_map.emplace(page_id, page);

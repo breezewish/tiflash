@@ -230,7 +230,12 @@ namespace DB
         F(type_cache_get, {{"type", "cache_get"}}, ExpBuckets{0.001, 1.5, 20}), \
         F(type_cache_get_snapshot, {{"type", "cache_get_snapshot"}}, ExpBuckets{0.001, 1.5, 20}), \
         F(type_cache_get_read, {{"type", "cache_get_read"}}, ExpBuckets{0.001, 1.5, 20}), \
-        F(type_cache_write, {{"type", "cache_write"}}, ExpBuckets{0.001, 1.5, 20})) \
+        F(type_cache_write, {{"type", "cache_write"}}, ExpBuckets{0.001, 1.5, 20}), \
+        F(type_ps_get_id, {{"type", "ps_get_id"}}, ExpBuckets{0.001, 1.5, 20}),  \
+        F(type_ps_read_blob, {{"type", "ps_read_blob"}}, ExpBuckets{0.001, 1.5, 20}), \
+        F(type_ps_read_remote, {{"type", "ps_read_remote"}}, ExpBuckets{0.001, 1.5, 20}), \
+        F(type_ps_update_remote, {{"type", "ps_update_remote"}}, ExpBuckets{0.001, 1.5, 20}), \
+        F(type_ps_update_local, {{"type", "ps_update_local"}}, ExpBuckets{0.001, 1.5, 20})) \
     M(tiflash_disaggregated_details, "", Counter,                                                                                                   \
         F(type_cftiny_read, {{"type", "cftiny_read"}}),                                                                                             \
         F(type_cftiny_fetch, {{"type", "cftiny_fetch"}}))                                                                                           \
