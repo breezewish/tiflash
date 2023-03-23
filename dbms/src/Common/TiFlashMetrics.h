@@ -225,7 +225,8 @@ namespace DB
         F(type_build_task, {{"type", "build_task"}}, ExpBuckets{0.001, 2, 20}),                                                                     \
         F(type_fetch_page, {{"type", "fetch_page"}}, ExpBuckets{0.001, 2, 20}),                                                                     \
         F(type_pop_ready_tasks, {{"type", "pop_ready_tasks"}}, ExpBuckets{0.001, 2, 20}),                                                           \
-        F(type_build_stream, {{"type", "build_stream"}}, ExpBuckets{0.001, 2, 20}))                                                                 \
+        F(type_build_stream, {{"type", "build_stream"}}, ExpBuckets{0.001, 2, 20}), \
+        F(type_read_stream, {{"type", "read_stream"}}, ExpBuckets{0.001, 2, 20})) \
     M(tiflash_disaggregated_details, "", Counter,                                                                                                   \
         F(type_cftiny_read, {{"type", "cftiny_read"}}),                                                                                             \
         F(type_cftiny_fetch, {{"type", "cftiny_fetch"}}))                                                                                           \

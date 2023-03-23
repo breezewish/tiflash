@@ -102,6 +102,7 @@ RNRemoteSegmentThreadInputStream::~RNRemoteSegmentThreadInputStream()
     LOG_DEBUG(log, "RNRemoteSegmentThreadInputStream done, time blocked in pop task: {:.3f}sec, build task: {:.3f}sec", seconds_pop, seconds_build);
     GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_pop_ready_tasks).Observe(seconds_pop);
     GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_build_stream).Observe(seconds_build);
+    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_read_stream).Observe(seconds_read);
 }
 
 Block RNRemoteSegmentThreadInputStream::readImpl(FilterPtr & res_filter, bool return_filter)
@@ -140,13 +141,16 @@ Block RNRemoteSegmentThreadInputStream::readImpl(FilterPtr & res_filter, bool re
                 filter,
                 expected_block_size);
             seconds_build += watch.elapsedSeconds();
-            LOG_TRACE(log, "Read blocks from remote segment begin, segment_id={} state={}", cur_segment_id, magic_enum::enum_name(cur_read_task->state));
+            LOG_DEBUG(log, "Read blocks from remote segment begin, segment_id={} state={}", cur_segment_id, magic_enum::enum_name(cur_read_task->state));
         }
 
+        watch.restart();
         Block res = cur_stream->read(res_filter, return_filter);
+        seconds_read += watch.elapsedSeconds();
+
         if (!res)
         {
-            LOG_TRACE(log, "Read blocks from remote segment end, segment_id={}", cur_segment_id);
+            LOG_DEBUG(log, "Read blocks from remote segment end, segment_id={}", cur_segment_id);
             cur_segment_id = 0;
             cur_stream = {};
             cur_read_task = nullptr;

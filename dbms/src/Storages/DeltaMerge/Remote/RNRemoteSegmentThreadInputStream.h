@@ -98,6 +98,7 @@ private:
     Stopwatch watch;
     double seconds_pop;
     double seconds_build;
+    double seconds_read;
 
     size_t total_rows = 0;
     bool done = false;
