@@ -225,29 +225,36 @@ UniversalPageMap UniversalPageStorage::read(const std::vector<PageReadFields> & 
 
     LOG_INFO(Logger::get(), "Wenxuan: remote_read_infos.size={}", remote_read_infos.size());
 
-    w.restart();
-    auto [page_map_for_update_cache, remote_page_map] = remote_reader->read(remote_read_infos);
-    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_ps_read_remote).Observe(w.elapsedSeconds());
-
-    LOG_INFO(Logger::get(), "Wenxuan: page_map_for_update_cache.size={} remote_page_map.size={}", page_map_for_update_cache.size(), remote_page_map.size());
-
-    w.restart();
-    UniversalWriteBatch wb;
-    for (const auto & [page_id, page] : page_map_for_update_cache)
+    if (!remote_read_infos.empty())
     {
-        auto buf = std::make_shared<ReadBufferFromMemory>(page.data.begin(), page.data.size());
-        wb.updateRemotePage(page_id, buf, page.data.size());
-    }
-    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_ps_update_remote).Observe(w.elapsedSeconds());
+        w.restart();
+        auto [page_map_for_update_cache, remote_page_map] = remote_reader->read(remote_read_infos);
+        GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_ps_read_remote).Observe(w.elapsedSeconds());
 
-    w.restart();
-    tryUpdateLocalCacheForRemotePages(wb, snapshot);
-    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_ps_update_local).Observe(w.elapsedSeconds());
+        LOG_INFO(Logger::get(), "Wenxuan: page_map_for_update_cache.size={} remote_page_map.size={}", page_map_for_update_cache.size(), remote_page_map.size());
 
-    for (const auto & [page_id, page] : remote_page_map)
-    {
-        local_page_map.emplace(page_id, page);
+        if (!page_map_for_update_cache.empty())
+        {
+            w.restart();
+            UniversalWriteBatch wb;
+            for (const auto & [page_id, page] : page_map_for_update_cache)
+            {
+                auto buf = std::make_shared<ReadBufferFromMemory>(page.data.begin(), page.data.size());
+                wb.updateRemotePage(page_id, buf, page.data.size());
+            }
+            GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_ps_update_remote).Observe(w.elapsedSeconds());
+
+            w.restart();
+            tryUpdateLocalCacheForRemotePages(wb, snapshot);
+            GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_ps_update_local).Observe(w.elapsedSeconds());
+        }
+
+        for (const auto & [page_id, page] : remote_page_map)
+        {
+            local_page_map.emplace(page_id, page);
+        }
     }
+
     for (const auto & page_id_not_found : page_ids_not_found)
     {
         local_page_map.emplace(page_id_not_found, Page::invalidPage());
