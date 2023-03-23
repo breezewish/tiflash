@@ -16,6 +16,7 @@
 
 #include <Poco/Event.h>
 #include <boost_wrapper/priority_queue.h>
+#include <prometheus/gauge.h>
 
 #include <atomic>
 #include <boost/noncopyable.hpp>
@@ -93,10 +94,15 @@ public:
     void setQueueSize(size_t value);
     size_t getMaxThreads() const;
 
+    void setMetrics(prometheus::Gauge * queued_size, prometheus::Gauge * pending_size);
+
 private:
     mutable std::mutex mutex;
     std::condition_variable job_finished;
     std::condition_variable new_job_or_shutdown;
+
+    prometheus::Gauge * metrics_queued;
+    prometheus::Gauge * metrics_pending;
 
     size_t max_threads = 0;
     size_t max_free_threads = 0;

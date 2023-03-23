@@ -808,6 +808,9 @@ void initThreadPool(Poco::Util::LayeredConfiguration & config)
         /*max_threads*/ default_num_threads * 20,
         /*max_free_threads*/ default_num_threads,
         /*queue_size*/ default_num_threads * 8);
+    GlobalThreadPool::instance().setMetrics(
+        &GET_METRIC(tiflash_thread_queue_size, type_global_io),
+        &GET_METRIC(tiflash_thread_pending_size, type_global_io));
 
     auto disaggregated_mode = getDisaggregatedMode(config);
     if (disaggregated_mode == DisaggregatedMode::Compute)
@@ -816,10 +819,16 @@ void initThreadPool(Poco::Util::LayeredConfiguration & config)
             /*max_threads*/ default_num_threads,
             /*max_free_threads*/ default_num_threads / 2,
             /*queue_size*/ default_num_threads * 2);
+        RNPagePreparerPool::get().setMetrics(
+            &GET_METRIC(tiflash_thread_queue_size, type_page_prepare),
+            &GET_METRIC(tiflash_thread_pending_size, type_page_prepare));
         RNRemoteReadTaskPool::initialize(
             /*max_threads*/ default_num_threads,
             /*max_free_threads*/ default_num_threads / 2,
             /*queue_size*/ default_num_threads * 2);
+        RNRemoteReadTaskPool::get().setMetrics(
+            &GET_METRIC(tiflash_thread_queue_size, type_remote_read_task),
+            &GET_METRIC(tiflash_thread_pending_size, type_remote_read_task));
     }
 
     if (disaggregated_mode == DisaggregatedMode::Compute || disaggregated_mode == DisaggregatedMode::Storage)
@@ -828,10 +837,16 @@ void initThreadPool(Poco::Util::LayeredConfiguration & config)
             /*max_threads*/ default_num_threads,
             /*max_free_threads*/ default_num_threads / 2,
             /*queue_size*/ default_num_threads * 2);
+        DataStoreS3Pool::get().setMetrics(
+            &GET_METRIC(tiflash_thread_queue_size, type_data_store_s3),
+            &GET_METRIC(tiflash_thread_pending_size, type_data_store_s3));
         S3FileCachePool::initialize(
             /*max_threads*/ default_num_threads,
             /*max_free_threads*/ default_num_threads / 2,
             /*queue_size*/ default_num_threads * 2);
+        S3FileCachePool::get().setMetrics(
+            &GET_METRIC(tiflash_thread_queue_size, type_s3_file_cache),
+            &GET_METRIC(tiflash_thread_pending_size, type_s3_file_cache));
     }
 }
 
@@ -843,7 +858,7 @@ void adjustThreadPoolSize(const Settings & settings, size_t logical_cores)
     // Note: Global Thread Pool must be larger than sub thread pools.
     GlobalThreadPool::instance().setMaxThreads(max_io_thread_count * 20);
     GlobalThreadPool::instance().setMaxFreeThreads(max_io_thread_count);
-    GlobalThreadPool::instance().setQueueSize(max_io_thread_count * 8);
+    GlobalThreadPool::instance().setQueueSize(max_io_thread_count * 40);
 
     if (RNPagePreparerPool::instance)
     {

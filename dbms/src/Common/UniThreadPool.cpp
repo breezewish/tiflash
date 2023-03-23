@@ -88,6 +88,13 @@ void ThreadPoolImpl<Thread>::setQueueSize(size_t value)
     jobs.reserve(queue_size);
 }
 
+template <typename Thread>
+void ThreadPoolImpl<Thread>::setMetrics(prometheus::Gauge * queued_size, prometheus::Gauge * pending_size)
+{
+    std::lock_guard lock(mutex);
+    metrics_queued = queued_size;
+    metrics_pending = pending_size;
+}
 
 template <typename Thread>
 template <typename ReturnType>
@@ -121,13 +128,25 @@ ReturnType ThreadPoolImpl<Thread>::scheduleImpl(Job job, ssize_t priority, std::
             return !queue_size || scheduled_jobs < queue_size || shutdown;
         };
 
+        if (metrics_pending)
+            metrics_pending->Increment();
+
         if (wait_microseconds) /// Check for optional. Condition is true if the optional is set and the value is zero.
         {
             if (!job_finished.wait_for(lock, std::chrono::microseconds(*wait_microseconds), pred))
+            {
+                if (metrics_pending)
+                    metrics_pending->Decrement();
+
                 return on_error(fmt::format("no free thread (timeout={})", *wait_microseconds));
+            }
         }
         else
+        {
             job_finished.wait(lock, pred);
+            if (metrics_pending)
+                metrics_pending->Decrement();
+        }
 
         if (shutdown)
             return on_error("shutdown");
@@ -163,6 +182,8 @@ ReturnType ThreadPoolImpl<Thread>::scheduleImpl(Job job, ssize_t priority, std::
                      priority);
 
         ++scheduled_jobs;
+        if (metrics_queued)
+            metrics_queued->Set(scheduled_jobs);
     }
 
     new_job_or_shutdown.notify_one();
@@ -312,6 +333,8 @@ void ThreadPoolImpl<Thread>::worker(typename std::list<Thread>::iterator thread_
                     if (shutdown_on_exception)
                         shutdown = true;
                     --scheduled_jobs;
+                    if (metrics_queued)
+                        metrics_queued->Set(scheduled_jobs);
                 }
 
                 job_finished.notify_all();
@@ -323,6 +346,8 @@ void ThreadPoolImpl<Thread>::worker(typename std::list<Thread>::iterator thread_
         {
             std::lock_guard lock(mutex);
             --scheduled_jobs;
+            if (metrics_queued)
+                metrics_queued->Set(scheduled_jobs);
 
             if (threads.size() > scheduled_jobs + max_free_threads)
             {

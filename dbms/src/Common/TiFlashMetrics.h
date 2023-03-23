@@ -321,7 +321,19 @@ namespace DB
         F(type_complete_multi_part_upload, {{"type", "complete_multi_part_upload"}}, ExpBuckets{0.001, 2, 20}),                                     \
         F(type_list_objects, {{"type", "list_objects"}}, ExpBuckets{0.001, 2, 20}),                                                                 \
         F(type_delete_object, {{"type", "delete_object"}}, ExpBuckets{0.001, 2, 20}),                                                               \
-        F(type_head_object, {{"type", "head_object"}}, ExpBuckets{0.001, 2, 20}))
+        F(type_head_object, {{"type", "head_object"}}, ExpBuckets{0.001, 2, 20}))                                                                   \
+    M(tiflash_thread_queue_size, "TiFlash thread queue size", Gauge,                                                  \
+        F(type_data_store_s3, {{"type", "data_store_s3"}}),                                                                                           \
+        F(type_s3_file_cache, {{"type", "s3_file_cache"}}),                                                                         \
+        F(type_remote_read_task, {{"type", "remote_read_task"}}),                                                                                               \
+        F(type_page_prepare, {{"type", "page_prepare"}}),   \
+        F(type_global_io, {{"type", "global_io"}})) \
+    M(tiflash_thread_pending_size, "TiFlash thread pending size", Gauge,                                                  \
+        F(type_data_store_s3, {{"type", "data_store_s3"}}),                                                                                           \
+        F(type_s3_file_cache, {{"type", "s3_file_cache"}}),                                                                         \
+        F(type_remote_read_task, {{"type", "remote_read_task"}}),                                                                                               \
+        F(type_page_prepare, {{"type", "page_prepare"}}),   \
+        F(type_global_io, {{"type", "global_io"}}))
 
 // clang-format on
 
