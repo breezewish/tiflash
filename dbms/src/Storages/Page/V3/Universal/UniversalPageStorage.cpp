@@ -223,9 +223,13 @@ UniversalPageMap UniversalPageStorage::read(const std::vector<PageReadFields> & 
     auto local_page_map = blob_store->read(local_read_infos, read_limiter);
     GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_ps_read_blob).Observe(w.elapsedSeconds());
 
+    LOG_INFO(Logger::get(), "Wenxuan: remote_read_infos.size={}", remote_read_infos.size());
+
     w.restart();
     auto [page_map_for_update_cache, remote_page_map] = remote_reader->read(remote_read_infos);
     GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_ps_read_remote).Observe(w.elapsedSeconds());
+
+    LOG_INFO(Logger::get(), "Wenxuan: page_map_for_update_cache.size={} remote_page_map.size={}", page_map_for_update_cache.size(), remote_page_map.size());
 
     w.restart();
     UniversalWriteBatch wb;
