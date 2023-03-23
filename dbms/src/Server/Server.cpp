@@ -964,6 +964,9 @@ int Server::main(const std::vector<std::string> & /*args*/)
     registerTableFunctions();
     registerStorages();
 
+    /// Initialize the labels of tiflash compute node.
+    ComputeLabelHolder::instance().init(config());
+
     // Later we may create thread pool from GlobalThreadPool
     // init it before other components
     initThreadPool(config());
@@ -1285,9 +1288,6 @@ int Server::main(const std::vector<std::string> & /*args*/)
 
     if (config().has("macros"))
         global_context->setMacros(std::make_unique<Macros>(config(), "macros"));
-
-    /// Initialize the labels of tiflash compute node.
-    ComputeLabelHolder::instance().init(config());
 
     /// Init TiFlash metrics.
     global_context->initializeTiFlashMetrics();
