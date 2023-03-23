@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Common/TiFlashMetrics.h>
 #include <IO/ReadBuffer.h>
 #include <IO/ReadBufferFromString.h>
 #include <Interpreters/Context.h>
@@ -53,6 +54,8 @@ void RNLocalPageCache::write(
     PageSize size,
     const PageFieldSizes & field_sizes)
 {
+    Stopwatch w;
+
     auto key = buildCacheId(oid);
 
     if (max_size > 0)
@@ -73,6 +76,8 @@ void RNLocalPageCache::write(
     UniversalWriteBatch cache_wb;
     cache_wb.putPage(key, 0, read_buffer, size, field_sizes);
     storage->write(std::move(cache_wb));
+
+    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_cache_write).Observe(w.elapsedSeconds());
 }
 
 void RNLocalPageCache::write(const PageOID & oid, std::string_view data, const PageFieldSizes & field_sizes)
@@ -83,6 +88,8 @@ void RNLocalPageCache::write(const PageOID & oid, std::string_view data, const P
 
 Page RNLocalPageCache::getPage(const PageOID & oid, const std::vector<size_t> & indices)
 {
+    Stopwatch w;
+
     auto key = buildCacheId(oid);
 
     if (max_size > 0)
@@ -101,6 +108,8 @@ Page RNLocalPageCache::getPage(const PageOID & oid, const std::vector<size_t> & 
         snapshot,
         /* throw_on_not_exist */ true);
     auto page = page_map.at(key);
+
+    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_cache_get).Observe(w.elapsedSeconds());
 
     RUNTIME_CHECK(page.isValid());
 
