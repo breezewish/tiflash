@@ -228,6 +228,8 @@ namespace DB
         F(type_build_stream, {{"type", "build_stream"}}, ExpBuckets{0.001, 1.5, 20}), \
         F(type_read_stream, {{"type", "read_stream"}}, ExpBuckets{0.001, 1.5, 20}),  \
         F(type_cache_get, {{"type", "cache_get"}}, ExpBuckets{0.001, 1.5, 20}), \
+        F(type_cache_get_snapshot, {{"type", "cache_get_snapshot"}}, ExpBuckets{0.001, 1.5, 20}), \
+        F(type_cache_get_read, {{"type", "cache_get_read"}}, ExpBuckets{0.001, 1.5, 20}), \
         F(type_cache_write, {{"type", "cache_write"}}, ExpBuckets{0.001, 1.5, 20})) \
     M(tiflash_disaggregated_details, "", Counter,                                                                                                   \
         F(type_cftiny_read, {{"type", "cftiny_read"}}),                                                                                             \
