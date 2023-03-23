@@ -101,7 +101,11 @@ Page RNLocalPageCache::getPage(const PageOID & oid, const std::vector<size_t> & 
             key);
     }
 
+    Stopwatch w1;
     auto snapshot = storage->getSnapshot("RNLocalPageCache.getPage");
+    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_cache_get_snapshot).Observe(w1.elapsedSeconds());
+
+    w1.restart();
     auto page_map = storage->read(
         {{key, indices}},
         /* read_limiter */ nullptr,
@@ -110,6 +114,7 @@ Page RNLocalPageCache::getPage(const PageOID & oid, const std::vector<size_t> & 
     auto page = page_map.at(key);
 
     GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_cache_get).Observe(w.elapsedSeconds());
+    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_cache_get_read).Observe(w1.elapsedSeconds());
 
     RUNTIME_CHECK(page.isValid());
 
