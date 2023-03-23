@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <Common/StackTrace.h>
 #include <Poco/Event.h>
 #include <boost_wrapper/priority_queue.h>
 #include <prometheus/gauge.h>
@@ -103,6 +104,9 @@ private:
 
     prometheus::Gauge * metrics_queued;
     prometheus::Gauge * metrics_pending;
+
+    // int current_call_idx = 0;
+    // std::map<int, std::unique_ptr<StackTrace>> pending_callstacks;
 
     size_t max_threads = 0;
     size_t max_free_threads = 0;

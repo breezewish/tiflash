@@ -24,6 +24,8 @@
 #include <iostream>
 #include <type_traits>
 
+#include "Common/StackTrace.h"
+
 namespace DB::ErrorCodes
 {
 extern const int CANNOT_SCHEDULE_TASK;
@@ -128,18 +130,22 @@ ReturnType ThreadPoolImpl<Thread>::scheduleImpl(Job job, ssize_t priority, std::
             return !queue_size || scheduled_jobs < queue_size || shutdown;
         };
 
+        // int call_idx = (++current_call_idx);
+
         if (metrics_pending)
             metrics_pending->Increment();
 
+        // pending_callstacks[call_idx] = std::make_unique<StackTrace>();
+
         if (wait_microseconds) /// Check for optional. Condition is true if the optional is set and the value is zero.
         {
-            if (!job_finished.wait_for(lock, std::chrono::microseconds(*wait_microseconds), pred))
-            {
-                if (metrics_pending)
-                    metrics_pending->Decrement();
+            auto wait_result = job_finished.wait_for(lock, std::chrono::microseconds(*wait_microseconds), pred);
 
+            if (metrics_pending)
+                metrics_pending->Decrement();
+
+            if (!wait_result)
                 return on_error(fmt::format("no free thread (timeout={})", *wait_microseconds));
-            }
         }
         else
         {
