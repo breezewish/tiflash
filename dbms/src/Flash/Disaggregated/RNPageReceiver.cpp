@@ -93,7 +93,7 @@ RNPageReceiverBase<RPCContext>::RNPageReceiverBase(
 {
     try
     {
-        msg_channel = std::make_unique<MPMCQueue<PageReceivedMessagePtr>>(max_buffer_size);
+        msg_channel = std::make_unique<MPMCQueue<PageReceivedMessagePtr>>(source_num_ * 2);
         // setup fetch threads to fetch pages/blocks from write nodes
         setUpConnection();
     }

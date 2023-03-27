@@ -96,8 +96,8 @@ private:
     TableID physical_table_id;
 
     Stopwatch watch;
-    double seconds_next_task;
-    double seconds_build_stream;
+    // double seconds_next_task;
+    // double seconds_build_stream;
 
     size_t total_rows = 0;
     bool done = false;

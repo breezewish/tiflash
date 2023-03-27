@@ -84,8 +84,8 @@ RNRemoteSegmentThreadInputStream::RNRemoteSegmentThreadInputStream(
     , extra_table_id_index(extra_table_id_index_)
     , keyspace_id(NullspaceID)
     , physical_table_id(-1)
-    , seconds_next_task(0.0)
-    , seconds_build_stream(0.0)
+    // , seconds_next_task(0.0)
+    // , seconds_build_stream(0.0)
     , cur_segment_id(0)
     , log(Logger::get(String(req_id)))
 {
@@ -99,9 +99,8 @@ RNRemoteSegmentThreadInputStream::RNRemoteSegmentThreadInputStream(
 
 RNRemoteSegmentThreadInputStream::~RNRemoteSegmentThreadInputStream()
 {
-    LOG_DEBUG(log, "RNRemoteSegmentThreadInputStream done, total_next_task={:.3f}sec, total_build_stream={:.3f}sec", seconds_next_task, seconds_build_stream);
-    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_seg_next_task).Observe(seconds_next_task);
-    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_seg_build_stream).Observe(seconds_build_stream);
+    // LOG_DEBUG(log, "RNRemoteSegmentThreadInputStream done, total_next_task={:.3f}sec, total_build_stream={:.3f}sec", seconds_next_task, seconds_build_stream);
+    // GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_seg_next_task).Observe(seconds_next_task);
 }
 
 Block RNRemoteSegmentThreadInputStream::readImpl(FilterPtr & res_filter, bool return_filter)
@@ -114,8 +113,10 @@ Block RNRemoteSegmentThreadInputStream::readImpl(FilterPtr & res_filter, bool re
         {
             watch.restart();
             cur_read_task = read_tasks->nextReadyTask();
-            seconds_next_task += watch.elapsedSeconds();
+            GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_seg_next_task).Observe(watch.elapsedSeconds());
+            // seconds_next_task += watch.elapsedSeconds();
             watch.restart();
+
             if (!cur_read_task)
             {
                 // There is no task left or error happen
@@ -133,17 +134,23 @@ Block RNRemoteSegmentThreadInputStream::readImpl(FilterPtr & res_filter, bool re
             keyspace_id = cur_read_task->ks_table_id.first;
             physical_table_id = cur_read_task->ks_table_id.second;
             UNUSED(read_mode); // TODO: support more read mode
+
+            // Stopwatch w_seg;
             cur_stream = cur_read_task->getInputStream(
                 columns_to_read,
                 cur_read_task->getReadRanges(),
                 max_version,
                 filter,
                 expected_block_size);
-            seconds_build_stream += watch.elapsedSeconds();
+            GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_seg_build_stream).Observe(watch.elapsedSeconds());
+            // seconds_build_stream += watch.elapsedSeconds();
             LOG_TRACE(log, "Read blocks from remote segment begin, segment_id={} state={}", cur_segment_id, magic_enum::enum_name(cur_read_task->state));
         }
 
+        Stopwatch w;
         Block res = cur_stream->read(res_filter, return_filter);
+        GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_seg_read).Observe(w.elapsedSeconds());
+
         if (!res)
         {
             LOG_TRACE(log, "Read blocks from remote segment end, segment_id={}", cur_segment_id);

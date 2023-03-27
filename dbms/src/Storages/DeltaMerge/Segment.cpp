@@ -714,7 +714,9 @@ BlockInputStreamPtr Segment::getInputStreamModeNormal(const DMContext & dm_conte
 {
     LOG_TRACE(log, "Begin segment create input stream");
 
+    Stopwatch watch;
     auto read_info = getReadInfo(dm_context, columns_to_read, segment_snap, read_ranges, max_version);
+    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_seg_place_index).Observe(watch.elapsedSeconds());
 
     RowKeyRanges real_ranges;
     for (const auto & read_range : read_ranges)
@@ -2174,8 +2176,11 @@ SkippableBlockInputStreamPtr Segment::getPlacedStream(const DMContext & dm_conte
     if (unlikely(rowkey_ranges.empty()))
         throw Exception("rowkey ranges shouldn't be empty", ErrorCodes::LOGICAL_ERROR);
 
+    Stopwatch watch;
     SkippableBlockInputStreamPtr stable_input_stream
         = stable_snap->getInputStream(dm_context, read_columns, rowkey_ranges, filter, max_version, expected_block_size, false);
+    GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_seg_build_stream_stable).Observe(watch.elapsedSeconds());
+
     RowKeyRange rowkey_range = rowkey_ranges.size() == 1 ? rowkey_ranges[0] : mergeRanges(rowkey_ranges, rowkey_ranges[0].is_common_handle, rowkey_ranges[0].rowkey_column_size);
     if (!need_row_id)
     {
