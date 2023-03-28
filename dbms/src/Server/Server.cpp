@@ -971,9 +971,6 @@ int Server::main(const std::vector<std::string> & /*args*/)
     /// It must be done before any components referencing the metrics.
     ComputeLabelHolder::instance().init(config());
 
-    /// Init TiFlash metrics.
-    global_context->initializeTiFlashMetrics();
-
     // Later we may create thread pool from GlobalThreadPool
     // init it before other components
     initThreadPool(config());
@@ -1295,6 +1292,9 @@ int Server::main(const std::vector<std::string> & /*args*/)
 
     if (config().has("macros"))
         global_context->setMacros(std::make_unique<Macros>(config(), "macros"));
+
+    /// Init TiFlash metrics.
+    global_context->initializeTiFlashMetrics();
 
     /// Initialize users config reloader.
     auto users_config_reloader = UserConfig::parseSettings(config(), config_path, global_context, log);
