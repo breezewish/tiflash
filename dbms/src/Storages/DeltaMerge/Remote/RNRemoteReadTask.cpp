@@ -14,11 +14,10 @@
 
 #include <Common/Exception.h>
 #include <Common/Logger.h>
+#include <Common/ThreadManager.h>
 #include <Common/TiFlashMetrics.h>
-#include <Common/UniThreadPool.h>
 #include <DataStreams/IBlockInputStream.h>
 #include <DataStreams/NullBlockInputStream.h>
-#include <IO/IOThreadPools.h>
 #include <IO/ReadBufferFromMemory.h>
 #include <IO/ReadBufferFromString.h>
 #include <Interpreters/Context.h>
@@ -318,6 +317,8 @@ RNRemoteTableReadTaskPtr RNRemoteTableReadTask::buildFrom(
 
     std::vector<std::future<RNRemoteSegmentReadTaskPtr>> futures;
 
+    auto thread_manager = newThreadManager();
+
     auto size = static_cast<size_t>(remote_table.segments().size());
     for (size_t idx = 0; idx < size; ++idx)
     {
@@ -340,8 +341,11 @@ RNRemoteTableReadTaskPtr RNRemoteTableReadTask::buildFrom(
         });
 
         futures.emplace_back(task->get_future());
-        RNRemoteReadTaskPool::get().scheduleOrThrowOnError([task] { (*task)(); });
+
+        thread_manager->schedule(false, "RemoteReadTask", [task] { (*task)(); });
     }
+
+    thread_manager->wait();
 
     for (auto & f : futures)
         table_task->tasks.push_back(f.get());
