@@ -26,7 +26,7 @@ namespace DB::DM::Remote
 RNLocalPageCache::RNLocalPageCache(const RNLocalPageCacheOptions & options)
     : log(Logger::get())
     , storage(options.underlying_storage)
-    , max_size(0)
+    , max_size(options.max_size_bytes)
     , evictable_keys(max_size)
 {
     RUNTIME_CHECK(storage != nullptr);
