@@ -113,6 +113,12 @@ Block RNRemoteSegmentThreadInputStream::readImpl(FilterPtr & res_filter, bool re
         {
             watch.restart();
             cur_read_task = read_tasks->nextReadyTask();
+            if (!read_tasks->getErrorMessage().empty())
+            {
+                done = true;
+                throw Exception(read_tasks->getErrorMessage(), ErrorCodes::LOGICAL_ERROR);
+            }
+
             GET_METRIC(tiflash_disaggregated_breakdown_duration_seconds, type_seg_next_task).Observe(watch.elapsedSeconds());
             // seconds_next_task += watch.elapsedSeconds();
             watch.restart();
@@ -121,10 +127,7 @@ Block RNRemoteSegmentThreadInputStream::readImpl(FilterPtr & res_filter, bool re
             {
                 // There is no task left or error happen
                 done = true;
-                if (!read_tasks->getErrorMessage().empty())
-                {
-                    throw Exception(read_tasks->getErrorMessage(), ErrorCodes::LOGICAL_ERROR);
-                }
+
                 LOG_DEBUG(log, "Read from remote segment done");
                 return {};
             }
