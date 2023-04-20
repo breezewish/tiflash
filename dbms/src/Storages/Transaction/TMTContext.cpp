@@ -41,7 +41,7 @@ namespace DB
 // default batch-read-index timeout is 10_000ms.
 extern const uint64_t DEFAULT_BATCH_READ_INDEX_TIMEOUT_MS = 10 * 1000;
 // default wait-index timeout is 5 * 60_000ms.
-extern const uint64_t DEFAULT_WAIT_INDEX_TIMEOUT_MS = 5 * 60 * 1000;
+extern const uint64_t DEFAULT_WAIT_INDEX_TIMEOUT_MS = 10 * 1000;
 
 const int64_t DEFAULT_WAIT_REGION_READY_TIMEOUT_SEC = 20 * 60;
 

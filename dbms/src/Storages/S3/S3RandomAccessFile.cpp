@@ -17,6 +17,7 @@
 #include <Common/Stopwatch.h>
 #include <Common/StringUtils/StringUtils.h>
 #include <Common/TiFlashMetrics.h>
+#include <Common/Tracer.h>
 #include <Encryption/RandomAccessFile.h>
 #include <Storages/S3/FileCache.h>
 #include <Storages/S3/MemoryRandomAccessFile.h>
@@ -58,6 +59,9 @@ std::string S3RandomAccessFile::getFileName() const
 
 ssize_t S3RandomAccessFile::read(char * buf, size_t size)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     while (true)
     {
         auto n = readImpl(buf, size);
@@ -90,6 +94,9 @@ ssize_t S3RandomAccessFile::readImpl(char * buf, size_t size)
 
 off_t S3RandomAccessFile::seek(off_t offset_, int whence)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     while (true)
     {
         auto off = seekImpl(offset_, whence);
@@ -146,6 +153,9 @@ String S3RandomAccessFile::readRangeOfObject()
 
 bool S3RandomAccessFile::initialize()
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     Stopwatch sw;
     bool request_succ = false;
     Aws::S3::Model::GetObjectRequest req;

@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <Common/Tracer.h>
 #include <Storages/DeltaMerge/DeltaMergeDefines.h>
 #include <Storages/DeltaMerge/File/ColumnCache.h>
 #include <Storages/DeltaMerge/File/DMFileReader.h>
@@ -61,11 +62,17 @@ public:
 
     Block read() override
     {
+        auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+        auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
         return reader.read();
     }
 
     Block readWithFilter(const IColumn::Filter & filter) override
     {
+        auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+        auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
         return reader.readWithFilter(filter);
     }
 #ifndef DBMS_PUBLIC_GTEST

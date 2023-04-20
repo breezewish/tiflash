@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Common/Tracer.h>
 #include <DataStreams/TiRemoteBlockInputStream.h>
 #include <Flash/Coprocessor/DAGContext.h>
 #include <Flash/Coprocessor/InterpreterUtils.h>
@@ -47,6 +48,9 @@ BlockInputStreams StorageDisaggregated::read(
     size_t,
     unsigned num_streams)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     /// S3 config is enabled on the TiFlash compute node, let's read
     /// data from S3.
     bool remote_data_read = S3::ClientFactory::instance().isEnabled();

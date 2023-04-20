@@ -15,6 +15,7 @@
 #include <Common/Exception.h>
 #include <Common/FailPoint.h>
 #include <Common/TiFlashMetrics.h>
+#include <Common/Tracer.h>
 #include <Flash/EstablishCall.h>
 #include <Flash/Mpp/MPPTunnel.h>
 #include <Flash/Mpp/PacketWriter.h>
@@ -157,6 +158,9 @@ void MPPTunnel::close(const String & reason, bool wait_sender_finish)
 
 void MPPTunnel::write(TrackedMppDataPacketPtr && data)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     LOG_TRACE(log, "ready to write");
     {
         std::unique_lock lk(mu);
@@ -178,6 +182,9 @@ void MPPTunnel::write(TrackedMppDataPacketPtr && data)
 
 void MPPTunnel::nonBlockingWrite(TrackedMppDataPacketPtr && data)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     LOG_TRACE(log, "start non blocking writing");
 
     FAIL_POINT_TRIGGER_EXCEPTION(FailPoints::random_tunnel_write_failpoint);
@@ -400,6 +407,9 @@ SyncTunnelSender::~SyncTunnelSender()
 
 void SyncTunnelSender::sendJob(PacketWriter * writer)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     GET_METRIC(tiflash_thread_count, type_active_threads_of_establish_mpp).Increment();
     GET_METRIC(tiflash_thread_count, type_max_threads_of_establish_mpp).Set(std::max(GET_METRIC(tiflash_thread_count, type_max_threads_of_establish_mpp).Value(), GET_METRIC(tiflash_thread_count, type_active_threads_of_establish_mpp).Value()));
     String err_msg;
@@ -441,8 +451,14 @@ void SyncTunnelSender::sendJob(PacketWriter * writer)
 
 void SyncTunnelSender::startSendThread(PacketWriter * writer)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    // auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     thread_manager = newThreadManager();
-    thread_manager->schedule(true, "MPPTunnel", [this, writer] {
+    thread_manager->schedule(true, "MPPTunnel", [span, this, writer]() mutable {
+        // UNUSED(span);
+        auto scope2 = GlobalTracer::get()->WithActiveSpan(span);
+
         sendJob(writer);
     });
 }

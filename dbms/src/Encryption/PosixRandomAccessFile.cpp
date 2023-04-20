@@ -15,6 +15,7 @@
 #include <Common/Exception.h>
 #include <Common/ProfileEvents.h>
 #include <Common/TiFlashMetrics.h>
+#include <Common/Tracer.h>
 #include <Encryption/PosixRandomAccessFile.h>
 #include <Encryption/RateLimiter.h>
 #include <Storages/S3/FileCache.h>
@@ -98,11 +99,17 @@ void PosixRandomAccessFile::close()
 
 off_t PosixRandomAccessFile::seek(off_t offset, int whence)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     return ::lseek(fd, offset, whence);
 }
 
 ssize_t PosixRandomAccessFile::read(char * buf, size_t size)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     if (read_limiter != nullptr)
     {
         read_limiter->request(size);
@@ -116,6 +123,9 @@ ssize_t PosixRandomAccessFile::read(char * buf, size_t size)
 
 ssize_t PosixRandomAccessFile::pread(char * buf, size_t size, off_t offset) const
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     if (read_limiter != nullptr)
     {
         read_limiter->request(size);

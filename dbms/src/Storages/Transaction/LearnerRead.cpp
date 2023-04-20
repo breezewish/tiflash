@@ -16,6 +16,7 @@
 #include <Common/Stopwatch.h>
 #include <Common/TiFlashException.h>
 #include <Common/TiFlashMetrics.h>
+#include <Common/Tracer.h>
 #include <Flash/Coprocessor/DAGContext.h>
 #include <Interpreters/Context.h>
 #include <Interpreters/SharedContexts/Disagg.h>
@@ -153,6 +154,9 @@ LearnerReadSnapshot doLearnerRead(
     Context & context,
     const LoggerPtr & log)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     assert(log != nullptr);
     RUNTIME_ASSERT(!(context.getSharedContextDisagg()->isDisaggregatedComputeMode() && context.getSharedContextDisagg()->use_autoscaler));
 

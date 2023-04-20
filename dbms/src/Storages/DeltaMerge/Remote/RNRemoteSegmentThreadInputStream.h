@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <Common/Tracer.h>
 #include <Core/Defines.h>
 #include <DataStreams/IBlockInputStream.h>
 #include <DataStreams/IProfilingBlockInputStream.h>
@@ -75,6 +76,9 @@ public:
 protected:
     Block readImpl() override
     {
+        auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+        auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
         FilterPtr filter_ignored;
         return readImpl(filter_ignored, false);
     }

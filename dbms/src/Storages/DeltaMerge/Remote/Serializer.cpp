@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <Common/StringUtils/StringUtils.h>
+#include <Common/Tracer.h>
 #include <IO/CompressedReadBuffer.h>
 #include <IO/CompressedWriteBuffer.h>
 #include <Interpreters/Context.h>
@@ -113,6 +114,9 @@ SegmentSnapshotPtr Serializer::deserializeSegmentSnapshotFrom(
     TableID table_id,
     const RemotePb::RemoteSegment & proto)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     RowKeyRange segment_range;
     {
         ReadBufferFromString rb(proto.key_range());

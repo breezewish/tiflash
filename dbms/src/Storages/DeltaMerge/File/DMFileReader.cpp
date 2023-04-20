@@ -15,6 +15,7 @@
 #include <Columns/ColumnsCommon.h>
 #include <Common/CurrentMetrics.h>
 #include <Common/Stopwatch.h>
+#include <Common/Tracer.h>
 #include <Common/escapeForFileName.h>
 #include <DataTypes/IDataType.h>
 #include <Encryption/FileProvider.h>
@@ -662,6 +663,9 @@ void DMFileReader::readFromDisk(
     size_t skip_packs,
     bool force_seek)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     const auto stream_name = DMFile::getFileNameBase(column_define.id);
     if (auto iter = column_streams.find(stream_name); iter != column_streams.end())
     {

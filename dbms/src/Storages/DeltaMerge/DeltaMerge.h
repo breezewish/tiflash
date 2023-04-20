@@ -15,6 +15,7 @@
 #pragma once
 
 #include <Common/Exception.h>
+#include <Common/Tracer.h>
 #include <DataStreams/IBlockInputStream.h>
 #include <IO/ReadBufferFromFile.h>
 #include <IO/ReadHelpers.h>
@@ -170,6 +171,9 @@ public:
 
     Block read() override
     {
+        auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+        auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
         if constexpr (skippable_place)
         {
             if (sk_call_status == 0)

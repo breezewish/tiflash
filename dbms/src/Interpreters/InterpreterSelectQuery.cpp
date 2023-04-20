@@ -16,6 +16,7 @@
 #include <Common/FailPoint.h>
 #include <Common/Logger.h>
 #include <Common/TiFlashException.h>
+#include <Common/Tracer.h>
 #include <Common/typeid_cast.h>
 #include <Core/Field.h>
 #include <Core/SpillConfig.h>
@@ -466,6 +467,9 @@ InterpreterSelectQuery::AnalysisResult InterpreterSelectQuery::analyzeExpression
 
 void InterpreterSelectQuery::executeImpl(Pipeline & pipeline, const BlockInputStreamPtr & input, bool dry_run)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     if (input)
         pipeline.streams.push_back(input);
 

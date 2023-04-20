@@ -20,6 +20,7 @@
 #include <Common/MemoryTracker.h>
 #include <Common/ThreadFactory.h>
 #include <Common/ThreadManager.h>
+#include <Common/Tracer.h>
 #include <Common/setThreadName.h>
 #include <DataStreams/IProfilingBlockInputStream.h>
 #include <common/logger_useful.h>
@@ -121,11 +122,17 @@ public:
     /// Start background threads, start work.
     void process()
     {
+        auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+        auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
         if (!thread_manager)
             thread_manager = newThreadManager();
         active_threads = max_threads;
         for (size_t i = 0; i < max_threads; ++i)
-            thread_manager->schedule(true, handler.getName(), [this, i] { this->thread(i); });
+            thread_manager->schedule(true, handler.getName(), [this, i, span]() mutable {
+                auto scope2 = GlobalTracer::get()->WithActiveSpan(span);
+                this->thread(i);
+            });
     }
 
     /// Ask all sources to stop earlier than they run out.
@@ -250,6 +257,9 @@ private:
 
     void thread(size_t thread_num)
     {
+        auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+        auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
         work(thread_num, working_inputs);
         work(thread_num, working_additional_inputs);
 
@@ -303,6 +313,9 @@ private:
         // an exception occurred then the queue was cancelled.
         while (work.available_inputs.pop(input) == MPMCQueueResult::OK)
         {
+            auto span = GlobalTracer::get()->StartSpan("input.in->read");
+            auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
             /// The main work.
             Block block = input.in->read();
 

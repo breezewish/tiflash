@@ -16,6 +16,7 @@
 #include <Common/Stopwatch.h>
 #include <Common/ThreadMetricUtil.h>
 #include <Common/TiFlashMetrics.h>
+#include <Common/Tracer.h>
 #include <Common/VariantOp.h>
 #include <Common/getNumberOfCPUCores.h>
 #include <Common/setThreadName.h>
@@ -28,6 +29,8 @@
 #include <Flash/Disaggregated/WNFetchPagesStreamWriter.h>
 #include <Flash/EstablishCall.h>
 #include <Flash/FlashService.h>
+#include <Flash/GrpcCarrier.h>
+#include <Flash/GrpcTracer.h>
 #include <Flash/Management/ManualCompact.h>
 #include <Flash/Mpp/MPPHandler.h>
 #include <Flash/Mpp/MPPTaskManager.h>
@@ -50,6 +53,9 @@
 #include <grpcpp/support/status.h>
 #include <grpcpp/support/status_code_enum.h>
 #include <kvproto/disaggregated.pb.h>
+#include <opentelemetry/context/propagation/global_propagator.h>
+#include <opentelemetry/context/runtime_context.h>
+#include <opentelemetry/trace/context.h>
 
 #include <ext/scope_guard.h>
 
@@ -157,6 +163,9 @@ grpc::Status FlashService::Coprocessor(
     const coprocessor::Request * request,
     coprocessor::Response * response)
 {
+    LOG_INFO(Logger::get(), "Wenxuan: Handle FlashService::Coprocessor");
+    auto scope = GrpcTracer::getScopeFromGrpcContext(grpc_context);
+
     CPUAffinityManager::getInstance().bindSelfGrpcThread();
     LOG_DEBUG(log, "Handling coprocessor request: {}", request->DebugString());
 
@@ -230,6 +239,9 @@ grpc::Status FlashService::Coprocessor(
 
 grpc::Status FlashService::BatchCoprocessor(grpc::ServerContext * grpc_context, const coprocessor::BatchRequest * request, grpc::ServerWriter<coprocessor::BatchResponse> * writer)
 {
+    LOG_INFO(Logger::get(), "Wenxuan: Handle FlashService::BatchCoprocessor");
+    auto scope = GrpcTracer::getScopeFromGrpcContext(grpc_context);
+
     CPUAffinityManager::getInstance().bindSelfGrpcThread();
     LOG_DEBUG(log, "Handling coprocessor request: {}", request->DebugString());
 
@@ -266,6 +278,9 @@ grpc::Status FlashService::DispatchMPPTask(
     const mpp::DispatchTaskRequest * request,
     mpp::DispatchTaskResponse * response)
 {
+    LOG_INFO(Logger::get(), "Wenxuan: Handle FlashService::DispatchMPPTask");
+    auto scope = GrpcTracer::getScopeFromGrpcContext(grpc_context);
+
     CPUAffinityManager::getInstance().bindSelfGrpcThread();
     LOG_DEBUG(log, "Handling mpp dispatch request: {}", request->DebugString());
     auto check_result = checkGrpcContext(grpc_context);
@@ -354,6 +369,9 @@ grpc::Status AsyncFlashService::establishMPPConnectionAsync(grpc::ServerContext 
                                                             const mpp::EstablishMPPConnectionRequest * request,
                                                             EstablishCallData * call_data)
 {
+    LOG_INFO(Logger::get(), "Wenxuan: Handle AsyncFlashService::establishMPPConnectionAsync");
+    auto scope = GrpcTracer::getScopeFromGrpcContext(grpc_context);
+
     CPUAffinityManager::getInstance().bindSelfGrpcThread();
     // Establish a pipe for data transferring. The pipes have registered by the task in advance.
     // We need to find it out and bind the grpc stream with it.
@@ -379,6 +397,9 @@ grpc::Status AsyncFlashService::establishMPPConnectionAsync(grpc::ServerContext 
 
 grpc::Status FlashService::EstablishMPPConnection(grpc::ServerContext * grpc_context, const mpp::EstablishMPPConnectionRequest * request, grpc::ServerWriter<mpp::MPPDataPacket> * sync_writer)
 {
+    LOG_INFO(Logger::get(), "Wenxuan: Handle FlashService::EstablishMPPConnection");
+    auto scope = GrpcTracer::getScopeFromGrpcContext(grpc_context);
+
     CPUAffinityManager::getInstance().bindSelfGrpcThread();
     // Establish a pipe for data transferring. The pipes have registered by the task in advance.
     // We need to find it out and bind the grpc stream with it.
@@ -627,6 +648,9 @@ grpc::Status FlashService::tryMarkDelete(grpc::ServerContext * grpc_context, con
 
 grpc::Status FlashService::EstablishDisaggTask(grpc::ServerContext * grpc_context, const disaggregated::EstablishDisaggTaskRequest * request, disaggregated::EstablishDisaggTaskResponse * response)
 {
+    LOG_INFO(Logger::get(), "Wenxuan: Handle FlashService::EstablishDisaggTask");
+    auto scope = GrpcTracer::getScopeFromGrpcContext(grpc_context);
+
     CPUAffinityManager::getInstance().bindSelfGrpcThread();
     LOG_DEBUG(log, "Handling EstablishDisaggTask request: {}", request->ShortDebugString());
     if (auto check_result = checkGrpcContext(grpc_context); !check_result.ok())

@@ -14,6 +14,7 @@
 
 #include <Common/Exception.h>
 #include <Common/TiFlashException.h>
+#include <Common/Tracer.h>
 #include <Flash/Coprocessor/DAGContext.h>
 #include <Flash/Coprocessor/DAGUtils.h>
 #include <Flash/Disaggregated/WNEstablishDisaggTaskHandler.h>
@@ -27,6 +28,7 @@
 #include <Storages/Transaction/KVStore.h>
 #include <Storages/Transaction/TMTContext.h>
 #include <kvproto/disaggregated.pb.h>
+
 
 namespace DB
 {
@@ -42,6 +44,9 @@ WNEstablishDisaggTaskHandler::WNEstablishDisaggTaskHandler(ContextPtr context_, 
 // - Set the read_tso, schema_version, timezone
 void WNEstablishDisaggTaskHandler::prepare(const disaggregated::EstablishDisaggTaskRequest * request)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     const auto & meta = request->meta();
 
     auto & tmt_context = context->getTMTContext();
@@ -80,6 +85,9 @@ void WNEstablishDisaggTaskHandler::prepare(const disaggregated::EstablishDisaggT
 
 void WNEstablishDisaggTaskHandler::execute(disaggregated::EstablishDisaggTaskResponse * response)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     // run into DAGStorageInterpreter and build the segment snapshots
     query_executor_holder.set(queryExecute(*context));
 

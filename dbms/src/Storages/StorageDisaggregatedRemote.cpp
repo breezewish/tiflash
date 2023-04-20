@@ -16,6 +16,7 @@
 #include <Common/Stopwatch.h>
 #include <Common/ThreadManager.h>
 #include <Common/TiFlashMetrics.h>
+#include <Common/Tracer.h>
 #include <Core/NamesAndTypes.h>
 #include <DataStreams/IBlockInputStream.h>
 #include <DataStreams/TiRemoteBlockInputStream.h>
@@ -91,6 +92,9 @@ BlockInputStreams StorageDisaggregated::readFromWriteNode(
     const Context & db_context,
     unsigned num_streams)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     using namespace pingcap;
 
     auto scan_context = std::make_shared<DM::ScanContext>();
@@ -153,6 +157,9 @@ DM::RNRemoteReadTaskPtr StorageDisaggregated::buildDisaggTasks(
     const DM::ScanContextPtr & scan_context,
     const std::vector<pingcap::coprocessor::BatchCopTask> & batch_cop_tasks)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    // auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     size_t tasks_n = batch_cop_tasks.size();
 
     std::mutex store_read_tasks_lock;
@@ -168,7 +175,8 @@ DM::RNRemoteReadTaskPtr StorageDisaggregated::buildDisaggTasks(
         thread_manager->schedule(
             true,
             "BuildDisaggTask",
-            [&] {
+            [&, span]() mutable {
+                auto scope2 = GlobalTracer::get()->WithActiveSpan(span);
                 buildDisaggTask(
                     db_context,
                     scan_context,
@@ -192,6 +200,9 @@ void StorageDisaggregated::buildDisaggTask(
     std::vector<DM::RNRemoteStoreReadTaskPtr> & store_read_tasks,
     std::mutex & store_read_tasks_lock)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     Stopwatch watch;
 
     auto req = buildDisaggTaskForNode(db_context, batch_cop_task);
@@ -216,6 +227,9 @@ void StorageDisaggregated::buildDisaggTask(
 
     if (resp->has_error())
     {
+        auto span2 = GlobalTracer::get()->StartSpan("HandleResponseError");
+        auto scope2 = GlobalTracer::get()->WithActiveSpan(span2);
+
         // We meet error in the EstablishDisaggTask response.
         if (resp->error().has_error_region())
         {

@@ -14,6 +14,7 @@
 
 #include <Common/FailPoint.h>
 #include <Common/Stopwatch.h>
+#include <Common/Tracer.h>
 #include <Flash/Coprocessor/DAGContext.h>
 #include <Flash/Mpp/MPPHandler.h>
 #include <Flash/Mpp/MPPTask.h>
@@ -78,6 +79,9 @@ void MPPHandler::handleError(const MPPTaskPtr & task, String error)
 // execute is responsible for making plan , register tasks and tunnels and start the running thread.
 grpc::Status MPPHandler::execute(const ContextPtr & context, mpp::DispatchTaskResponse * response)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     MPPTaskPtr task = nullptr;
     SCOPE_EXIT({
         current_memory_tracker = nullptr; /// to avoid reusing threads in gRPC

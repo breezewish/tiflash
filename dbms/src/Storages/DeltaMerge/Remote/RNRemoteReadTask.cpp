@@ -15,6 +15,7 @@
 #include <Common/Exception.h>
 #include <Common/Logger.h>
 #include <Common/TiFlashMetrics.h>
+#include <Common/Tracer.h>
 #include <Common/UniThreadPool.h>
 #include <DataStreams/IBlockInputStream.h>
 #include <DataStreams/NullBlockInputStream.h>
@@ -348,6 +349,9 @@ RNRemotePhysicalTableReadTaskPtr RNRemotePhysicalTableReadTask::buildFrom(
     const RemotePb::RemotePhysicalTable & remote_table,
     const LoggerPtr & log)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    // auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     // Deserialize from `DisaggregatedPhysicalTable`, this should also
     // ensure the local cache pages.
     auto table_task = std::make_shared<RNRemotePhysicalTableReadTask>(
@@ -363,7 +367,9 @@ RNRemotePhysicalTableReadTaskPtr RNRemotePhysicalTableReadTask::buildFrom(
     {
         const auto & remote_seg = remote_table.segments(idx);
 
-        auto task = std::make_shared<std::packaged_task<RNRemoteSegmentReadTaskPtr()>>([&, idx, size] {
+        auto task = std::make_shared<std::packaged_task<RNRemoteSegmentReadTaskPtr()>>([&, span, idx, size]() mutable {
+            auto scope2 = GlobalTracer::get()->WithActiveSpan(span);
+
             Stopwatch watch;
             SCOPE_EXIT({
                 LOG_DEBUG(log, "Build RNRemoteSegmentReadTask finished, elapsed={}s task_idx={} task_total={} segment_id={}", watch.elapsedSeconds(), idx, size, remote_seg.segment_id());
@@ -432,6 +438,9 @@ RNRemoteSegmentReadTaskPtr RNRemoteSegmentReadTask::buildFrom(
     const String & address,
     const LoggerPtr & log)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     RowKeyRange segment_range;
     {
         ReadBufferFromString rb(proto.key_range());

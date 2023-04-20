@@ -572,6 +572,7 @@ void ExchangeReceiverBase<RPCContext>::reactor(const std::vector<Request> & asyn
             if (handler->finished())
             {
                 --alive_async_connections;
+                LOG_INFO(Logger::get(), "Wenxuan: Async reactor connectionDone");
                 connectionDone(handler->meetError(), handler->getErrMsg(), handler->getLog());
             }
         }
@@ -605,6 +606,7 @@ void ExchangeReceiverBase<RPCContext>::readLoop(const Request & req)
         ReceiverChannelWriter channel_writer(&msg_channels, req_info, log, &data_size_in_queue, recv_mode);
         for (int i = 0; i < max_retry_times; ++i)
         {
+            LOG_INFO(Logger::get(), "Wenxuan: ExchangeReceiverBase sending request {}", req.debugString());
             auto reader = rpc_context->makeReader(req);
             bool has_data = false;
             for (;;)
@@ -669,6 +671,7 @@ void ExchangeReceiverBase<RPCContext>::readLoop(const Request & req)
         meet_error = true;
         local_err_msg = getCurrentExceptionMessage(false);
     }
+    LOG_INFO(Logger::get(), "Wenxuan: Read loop connectionDone");
     connectionDone(meet_error, local_err_msg, log);
 }
 

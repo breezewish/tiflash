@@ -127,6 +127,20 @@ if (OS_FREEBSD)
     target_compile_definitions (tiflash_common_io PUBLIC CLOCK_MONOTONIC_COARSE=CLOCK_MONOTONIC_FAST)
 endif ()
 
+target_include_directories(tiflash_common_io PUBLIC
+    ${TiFlash_SOURCE_DIR}/contrib/opentelemetry/sdk/include
+    ${TiFlash_SOURCE_DIR}/contrib/opentelemetry/api/include
+    ${TiFlash_SOURCE_DIR}/contrib/opentelemetry/exporters/otlp/include
+    ${TiFlash_SOURCE_DIR}/contrib/opentelemetry/exporters/ostream/include
+)
+target_link_libraries (tiflash_common_io PUBLIC
+    opentelemetry_api
+    opentelemetry_sdk
+    opentelemetry_exporter_ostream_span
+    opentelemetry_exporter_otlp_http
+)
+
+
 add_subdirectory(src/Common/Config)
 
 if (MAKE_STATIC_LIBRARIES)

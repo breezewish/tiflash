@@ -12,16 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Common/Tracer.h>
 #include <Debug/MockExecutor/AstToPBUtils.h>
 #include <Flash/EstablishCall.h>
+#include <Flash/GrpcCarrier.h>
+#include <Flash/GrpcTracer.h>
 #include <Interpreters/Context.h>
 #include <Server/FlashGrpcServerHolder.h>
+#include <grpcpp/support/interceptor.h>
+#include <opentelemetry/context/propagation/global_propagator.h>
+#include <opentelemetry/context/runtime_context.h>
+#include <opentelemetry/trace/context.h>
+#include <opentelemetry/trace/semantic_conventions.h>
+#include <opentelemetry/trace/span_startoptions.h>
 
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <string_view>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-builtins"
 // In order to include grpc::SecureServerCredentials which used in
 // sslServerCredentialsWithFetcher()
 // We implement sslServerCredentialsWithFetcher() to set config fetcher
 // to auto reload sslServerCredentials
+#include "../../contrib/grpc/src/core/lib/surface/call.h"
 #include "../../contrib/grpc/src/cpp/server/secure_server_credentials.h"
+#pragma GCC diagnostic pop
 
 namespace DB
 {
@@ -125,6 +144,92 @@ std::shared_ptr<grpc::ServerCredentials> sslServerCredentialsWithFetcher(Context
         new grpc::SecureServerCredentials(c_creds));
 }
 
+class ServerSpanInterceptor : public ::grpc::experimental::Interceptor
+{
+public:
+    explicit ServerSpanInterceptor(::grpc::experimental::ServerRpcInfo * info_)
+        : info(info_)
+    {
+    }
+
+    ~ServerSpanInterceptor() override
+    {
+        LOG_INFO(Logger::get(), "Finish receive RPC call {}", info->method());
+
+        if (trace_ctx)
+            trace_ctx->span->End();
+    }
+
+    void Intercept(::grpc::experimental::InterceptorBatchMethods * methods) override
+    {
+        if (methods->QueryInterceptionHookPoint(::grpc::experimental::InterceptionHookPoints::POST_RECV_INITIAL_METADATA))
+        {
+            onPostRecvInitialMetaData(methods);
+        }
+        methods->Proceed();
+    }
+
+private:
+    void onPostRecvInitialMetaData(
+        ::grpc::experimental::InterceptorBatchMethods * methods)
+    {
+        using namespace opentelemetry::trace::SemanticConventions;
+
+        LOG_INFO(Logger::get(), "Receive RPC call {}", info->method());
+        for (const auto & meta : info->server_context()->client_metadata())
+        {
+            auto key = std::string_view(meta.first.data(), meta.first.size());
+            auto value = std::string_view(meta.second.data(), meta.second.size());
+            LOG_INFO(Logger::get(), "ServerContext Meta: {}={}", key, value);
+        }
+        for (const auto & meta : *methods->GetRecvInitialMetadata())
+        {
+            auto key = std::string_view(meta.first.data(), meta.first.size());
+            auto value = std::string_view(meta.second.data(), meta.second.size());
+            LOG_INFO(Logger::get(), "RecvInitial Meta: {}={}", key, value);
+        }
+
+        GrpcServerCarrier carrier(info->server_context());
+        auto propagator = opentelemetry::context::propagation::GlobalTextMapPropagator::GetGlobalPropagator();
+        auto current_ctx = opentelemetry::context::RuntimeContext::GetCurrent();
+        auto new_context = propagator->Extract(carrier, current_ctx);
+        opentelemetry::trace::StartSpanOptions options;
+        options.kind = opentelemetry::trace::SpanKind::kServer;
+        options.parent = opentelemetry::trace::GetSpan(new_context)->GetContext();
+
+        // Trace ctx is alive within this RPC call.
+        trace_ctx = std::make_unique<GrpcTraceContext>();
+        trace_ctx->span = DB::GlobalTracer::get()->StartSpan(
+            fmt::format("rpc.server{}", info->method()),
+            {
+                {kRpcSystem, RpcSystemValues::kGrpc},
+                {kRpcService, "tiflash"},
+                {kRpcMethod, info->method()},
+                {"peer.address", info->server_context()->peer()},
+            },
+            options);
+        trace_ctx->foo = std::string(info->method());
+        // Record this span in the grpc::ServerContext.
+        GrpcTracer::setGrpcTraceContext(info->server_context(), trace_ctx.get());
+    }
+
+    std::unique_ptr<GrpcTraceContext> trace_ctx = nullptr;
+
+    // std::shared_ptr<opentelemetry::trace::Span> span;
+    ::grpc::experimental::ServerRpcInfo * info;
+};
+
+class ServerSpanInterceptorFactory : public ::grpc::experimental::ServerInterceptorFactoryInterface
+{
+public:
+    ServerSpanInterceptorFactory() = default;
+
+    ::grpc::experimental::Interceptor * CreateServerInterceptor(::grpc::experimental::ServerRpcInfo * info) override
+    {
+        return new ServerSpanInterceptor(info);
+    }
+};
+
 FlashGrpcServerHolder::FlashGrpcServerHolder(Context & context, Poco::Util::LayeredConfiguration & config_, const TiFlashRaftConfig & raft_config, const LoggerPtr & log_)
     : log(log_)
     , is_shutdown(std::make_shared<std::atomic<bool>>(false))
@@ -174,6 +279,14 @@ FlashGrpcServerHolder::FlashGrpcServerHolder(Context & context, Poco::Util::Laye
             notify_cqs.emplace_back(builder.AddCompletionQueue());
         }
     }
+
+    {
+        // Setup OpenTelemetry interceptors
+        std::vector<std::unique_ptr<::grpc::experimental::ServerInterceptorFactoryInterface>> interceptors;
+        interceptors.push_back(std::make_unique<ServerSpanInterceptorFactory>());
+        builder.experimental().SetInterceptorCreators(std::move(interceptors));
+    }
+
     flash_grpc_server = builder.BuildAndStart();
     if (!flash_grpc_server)
     {

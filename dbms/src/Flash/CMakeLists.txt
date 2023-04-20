@@ -32,3 +32,4 @@ add_headers_and_sources(flash_service ./Disaggregated)
 
 add_library(flash_service ${flash_service_headers} ${flash_service_sources})
 target_link_libraries(flash_service dbms)
+target_include_directories (flash_service PRIVATE ${TiFlash_SOURCE_DIR}/contrib/grpc/)

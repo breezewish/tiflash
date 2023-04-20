@@ -14,6 +14,7 @@
 
 #include <Common/Exception.h>
 #include <Common/Stopwatch.h>
+#include <Common/Tracer.h>
 #include <IO/IOThreadPools.h>
 #include <Poco/File.h>
 #include <Storages/DeltaMerge/Remote/DataStore/DataStore.h>
@@ -218,6 +219,9 @@ IPreparedDMFileTokenPtr DataStoreS3::prepareDMFileByKey(const String & remote_ke
 
 DMFilePtr S3PreparedDMFileToken::restore(DMFile::ReadMetaMode read_mode)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     return DMFile::restore(
         file_provider,
         oid.file_id,

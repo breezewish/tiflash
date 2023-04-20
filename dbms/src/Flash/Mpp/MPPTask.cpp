@@ -17,6 +17,7 @@
 #include <Common/ThreadFactory.h>
 #include <Common/ThreadManager.h>
 #include <Common/TiFlashMetrics.h>
+#include <Common/Tracer.h>
 #include <DataStreams/IProfilingBlockInputStream.h>
 #include <DataStreams/SquashingBlockOutputStream.h>
 #include <Flash/Coprocessor/DAGCodec.h>
@@ -151,7 +152,14 @@ void MPPTask::finishWrite()
 
 void MPPTask::run()
 {
-    newThreadManager()->scheduleThenDetach(true, "MPPTask", [self = shared_from_this()] { self->runImpl(); });
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    // auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
+    newThreadManager()->scheduleThenDetach(true, "MPPTask", [span, self = shared_from_this()]() mutable {
+        auto scope2 = GlobalTracer::get()->WithActiveSpan(span);
+
+        self->runImpl();
+    });
 }
 
 void MPPTask::registerTunnels(const mpp::DispatchTaskRequest & task_request)
@@ -265,6 +273,9 @@ void MPPTask::unregisterTask()
 
 void MPPTask::prepare(const mpp::DispatchTaskRequest & task_request)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     dag_req = getDAGRequestFromStringWithRetry(task_request.encoded_plan());
     TMTContext & tmt_context = context->getTMTContext();
     /// MPP task will only use key ranges in mpp::DispatchTaskRequest::regions/mpp::DispatchTaskRequest::table_regions.
@@ -341,6 +352,9 @@ void MPPTask::prepare(const mpp::DispatchTaskRequest & task_request)
 
 void MPPTask::preprocess()
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     auto start_time = Clock::now();
     initExchangeReceivers();
     LOG_DEBUG(log, "init exchange receiver done");
@@ -365,6 +379,9 @@ void MPPTask::preprocess()
 
 void MPPTask::runImpl()
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     CPUAffinityManager::getInstance().bindSelfQueryThread();
     RUNTIME_ASSERT(current_memory_tracker == process_list_entry->get().getMemoryTrackerPtr().get(), log, "The current memory tracker is not set correctly for MPPTask::runImpl");
     if (!switchStatus(INITIALIZING, RUNNING))

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Common/Tracer.h>
 #include <Flash/Pipeline/Exec/PipelineExec.h>
 #include <Operators/OperatorHelper.h>
 
@@ -80,6 +81,9 @@ OperatorStatus PipelineExec::execute()
  */
 OperatorStatus PipelineExec::executeImpl()
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     Block block;
     size_t start_transform_op_index = 0;
     auto op_status = fetchBlock(block, start_transform_op_index);

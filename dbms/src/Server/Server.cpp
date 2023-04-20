@@ -21,6 +21,7 @@
 #include <Common/DynamicThreadPool.h>
 #include <Common/Exception.h>
 #include <Common/FailPoint.h>
+#include <Common/LogSpanExporter.h>
 #include <Common/Macros.h>
 #include <Common/RedactHelpers.h>
 #include <Common/StringUtils/StringUtils.h>
@@ -28,6 +29,7 @@
 #include <Common/TiFlashBuildInfo.h>
 #include <Common/TiFlashException.h>
 #include <Common/TiFlashMetrics.h>
+#include <Common/Tracer.h>
 #include <Common/UniThreadPool.h>
 #include <Common/assert_cast.h>
 #include <Common/config.h>
@@ -44,6 +46,7 @@
 #include <Encryption/RateLimiter.h>
 #include <Flash/DiagnosticsService.h>
 #include <Flash/FlashService.h>
+#include <Flash/GrpcCarrier.h>
 #include <Flash/Mpp/GRPCCompletionQueuePool.h>
 #include <Flash/Pipeline/Schedule/TaskScheduler.h>
 #include <Functions/registerFunctions.h>
@@ -95,6 +98,16 @@
 #include <common/ErrorHandlers.h>
 #include <common/config_common.h>
 #include <common/logger_useful.h>
+#include <opentelemetry/context/propagation/global_propagator.h>
+#include <opentelemetry/exporters/ostream/span_exporter_factory.h>
+#include <opentelemetry/exporters/otlp/otlp_http_exporter_factory.h>
+#include <opentelemetry/sdk/resource/resource.h>
+#include <opentelemetry/sdk/trace/batch_span_processor_factory.h>
+#include <opentelemetry/sdk/trace/samplers/always_on_factory.h>
+#include <opentelemetry/sdk/trace/tracer_provider.h>
+#include <opentelemetry/trace/propagation/http_trace_context.h>
+#include <opentelemetry/trace/provider.h>
+#include <opentelemetry/trace/semantic_conventions.h>
 #include <sys/resource.h>
 
 #include <boost/algorithm/string/classification.hpp>
@@ -103,6 +116,8 @@
 #include <magic_enum.hpp>
 #include <memory>
 #include <thread>
+
+#include "opentelemetry/trace/span.h"
 
 #if Poco_NetSSL_FOUND
 #include <Common/grpcpp.h>
@@ -338,6 +353,83 @@ struct TiFlashProxyConfig
     }
 };
 
+class ClientSpanInterceptor : public ::grpc::experimental::Interceptor
+{
+public:
+    explicit ClientSpanInterceptor(::grpc::experimental::ClientRpcInfo * info_)
+        : info(info_)
+    {
+        LOG_INFO(Logger::get(), "Start RPC call {}", info->method());
+
+        using namespace opentelemetry::trace::SemanticConventions;
+
+        opentelemetry::trace::StartSpanOptions options;
+        options.kind = opentelemetry::trace::SpanKind::kClient;
+
+        span = DB::GlobalTracer::get()->StartSpan(
+            fmt::format("rpc.client{}", info->method()),
+            {
+                {kRpcSystem, RpcSystemValues::kGrpc},
+                {kRpcService, "tiflash"},
+                {kRpcMethod, info->method()},
+                {"peer.address", info->client_context()->peer()},
+            },
+            options);
+    }
+
+    ~ClientSpanInterceptor() override
+    {
+        LOG_INFO(Logger::get(), "Finish RPC call {}", info->method());
+
+        if (span)
+            span->End();
+    }
+
+    void Intercept(::grpc::experimental::InterceptorBatchMethods * methods) override
+    {
+        if (methods->QueryInterceptionHookPoint(::grpc::experimental::InterceptionHookPoints::PRE_SEND_INITIAL_METADATA))
+        {
+            onPreSendInitialMetadata(methods);
+        }
+        methods->Proceed();
+    }
+
+private:
+    void onPreSendInitialMetadata(
+        ::grpc::experimental::InterceptorBatchMethods * methods)
+    {
+        auto scope = GlobalTracer::get()->WithActiveSpan(span);
+        {
+            auto current_ctx = opentelemetry::context::RuntimeContext::GetCurrent();
+            DB::GrpcClientInterceptorCarrier carrier(methods);
+            auto prop = opentelemetry::context::propagation::GlobalTextMapPropagator::GetGlobalPropagator();
+            prop->Inject(carrier, current_ctx);
+        }
+    }
+
+    std::shared_ptr<opentelemetry::trace::Span> span;
+    ::grpc::experimental::ClientRpcInfo * info;
+};
+
+class ClientSpanInterceptorFactory : public ::grpc::experimental::ClientInterceptorFactoryInterface
+{
+public:
+    ClientSpanInterceptorFactory() = default;
+
+    ::grpc::experimental::Interceptor * CreateClientInterceptor(::grpc::experimental::ClientRpcInfo * info) override
+    {
+        if (std::strcmp(info->method(), "/tikvpb.Tikv/KvGet") == 0 //
+            || std::strcmp(info->method(), "/tikvpb.Tikv/KvScan") == 0 //
+        )
+        {
+            // Skip these RPC calls.
+            return nullptr;
+        }
+
+        return new ClientSpanInterceptor(info);
+    }
+};
+
 pingcap::ClusterConfig getClusterConfig(TiFlashSecurityConfigPtr security_config, const TiFlashRaftConfig & raft_config, const int api_version, const LoggerPtr & log)
 {
     pingcap::ClusterConfig config;
@@ -347,6 +439,11 @@ pingcap::ClusterConfig getClusterConfig(TiFlashSecurityConfigPtr security_config
     config.ca_path = ca_path;
     config.cert_path = cert_path;
     config.key_path = key_path;
+    config.get_client_interceptors = [] {
+        std::vector<std::unique_ptr<::grpc::experimental::ClientInterceptorFactoryInterface>> interceptors;
+        interceptors.emplace_back(std::make_unique<ClientSpanInterceptorFactory>());
+        return interceptors;
+    };
     switch (api_version)
     {
     case 1:
@@ -815,6 +912,7 @@ void adjustThreadPoolSize(const Settings & settings, size_t logical_cores)
     }
 }
 
+
 void syncSchemaWithTiDB(
     const TiFlashStorageConfig & storage_config,
     BgStorageInitHolder & bg_init_stores,
@@ -858,6 +956,73 @@ void syncSchemaWithTiDB(
 
     // init schema sync service with tidb
     global_context->initializeSchemaSyncService();
+}
+
+void initOpenTelemetry(Poco::Util::LayeredConfiguration & config)
+{
+    using namespace opentelemetry::sdk::trace;
+
+    String otlp_endpoint = config.getString("opentelemetry.endpoint", "http://127.0.0.1:4318");
+
+    if (otlp_endpoint.empty())
+    {
+        LOG_INFO(Logger::get(), "OpenTelemetry is disabled. Configure `opentelemetry.endpoint` to enable.");
+        return;
+    }
+
+    auto exporter_otlp = opentelemetry::exporter::otlp::OtlpHttpExporterFactory::Create({
+        .url = fmt::format("{}/v1/traces", otlp_endpoint),
+    });
+
+    auto processor_otlp = BatchSpanProcessorFactory::Create(
+        std::move(exporter_otlp),
+        {});
+
+    // auto exporter_log = std::make_unique<LogSpanExporter>();
+
+    // auto processor_log = BatchSpanProcessorFactory::Create(
+    //     std::move(exporter_log),
+    //     {});
+
+    String service_name = "TiFlash";
+    {
+        auto disagg_mode = getDisaggregatedMode(config);
+        switch (disagg_mode)
+        {
+        case DisaggregatedMode::Compute:
+            service_name = "TiFlashCompute";
+            break;
+        case DisaggregatedMode::Storage:
+            service_name = "TiFlashStorage";
+            break;
+        default:
+            break;
+        }
+    }
+
+    auto resource_attributes = opentelemetry::sdk::resource::ResourceAttributes{
+        {"service.name", service_name},
+        {"service.instance.id", config.getString("flash.service_addr", "0.0.0.0:3930")}}; // TODO: Use storeID
+    auto resource = opentelemetry::sdk::resource::Resource::Create(resource_attributes);
+
+    auto sampler = AlwaysOnSamplerFactory::Create();
+
+    std::vector<std::unique_ptr<SpanProcessor>> processors;
+    processors.emplace_back(std::move(processor_otlp));
+    // processors.emplace_back(std::move(processor_log));
+
+    auto tracer_provider = std::make_shared<TracerProvider>(
+        std::move(processors),
+        resource,
+        std::move(sampler));
+    opentelemetry::trace::Provider::SetTracerProvider(tracer_provider);
+
+    auto propagator = std::make_shared<opentelemetry::trace::propagation::HttpTraceContext>();
+    opentelemetry::context::propagation::GlobalTextMapPropagator::SetGlobalPropagator(propagator);
+
+    LOG_INFO(Logger::get(), "OpenTelemetry is enabled, exporter=OTLP_http endpoint={}", otlp_endpoint);
+
+    GlobalTracer::init();
 }
 
 int Server::main(const std::vector<std::string> & /*args*/)
@@ -964,6 +1129,7 @@ int Server::main(const std::vector<std::string> & /*args*/)
 
     LOG_INFO(log, "Using api_version={}", storage_config.api_version);
 
+    initOpenTelemetry(config());
     // Init Proxy's config
     TiFlashProxyConfig proxy_conf(config(), storage_config.s3_config.isS3Enabled());
     EngineStoreServerWrap tiflash_instance_wrap{};
