@@ -40,7 +40,8 @@ extern const char random_pipeline_model_event_finish_failpoint[];
 
 void Event::addInput(const EventPtr & input)
 {
-    assert(status == EventStatus::INIT);
+    RUNTIME_CHECK(status == EventStatus::INIT);
+    RUNTIME_CHECK(input.get() != this);
     input->addOutput(shared_from_this());
     ++unfinished_inputs;
     is_source = false;
@@ -48,8 +49,26 @@ void Event::addInput(const EventPtr & input)
 
 void Event::addOutput(const EventPtr & output)
 {
-    assert(status == EventStatus::INIT);
+    /// Output will also be added in the Finished state, as can be seen in the `insertEvent`.
+    RUNTIME_CHECK(status == EventStatus::INIT || status == EventStatus::FINISHED);
+    RUNTIME_CHECK(output.get() != this);
     outputs.push_back(output);
+}
+
+void Event::insertEvent(const EventPtr & insert_event) noexcept
+{
+    assert(insert_event);
+    assert(status == EventStatus::FINISHED);
+    /// eventA───────►eventB ===> eventA─────────────►eventB
+    ///                             │                    ▲
+    ///                             └────►insert_event───┘
+    for (const auto & output : outputs)
+    {
+        assert(output);
+        output->addInput(insert_event);
+    }
+    insert_event->addInput(shared_from_this());
+    RUNTIME_ASSERT(!insert_event->prepare());
 }
 
 void Event::onInputFinish() noexcept
@@ -60,9 +79,9 @@ void Event::onInputFinish() noexcept
         schedule();
 }
 
-bool Event::prepareForSource()
+bool Event::prepare()
 {
-    assert(status == EventStatus::INIT);
+    RUNTIME_CHECK(status == EventStatus::INIT);
     if (is_source)
     {
         // For source event, `exec_status.onEventSchedule()` needs to be called before schedule.

@@ -35,6 +35,8 @@
 #include <Flash/Disaggregated/RNPageReceiverContext.h>
 #include <Interpreters/Context.h>
 #include <Storages/DeltaMerge/DeltaMergeDefines.h>
+#include <Storages/DeltaMerge/DeltaMergeStore.h>
+#include <Storages/DeltaMerge/Filter/PushDownFilter.h>
 #include <Storages/DeltaMerge/Filter/RSOperator.h>
 #include <Storages/DeltaMerge/FilterParser/FilterParser.h>
 #include <Storages/DeltaMerge/Remote/DisaggTaskId.h>
@@ -42,7 +44,9 @@
 #include <Storages/DeltaMerge/Remote/RNRemoteReadTask.h>
 #include <Storages/DeltaMerge/Remote/RNRemoteSegmentThreadInputStream.h>
 #include <Storages/SelectQueryInfo.h>
+#include <Storages/StorageDeltaMerge.h>
 #include <Storages/StorageDisaggregated.h>
+#include <Storages/Transaction/DecodingStorageSchemaSnapshot.h>
 #include <Storages/Transaction/TMTContext.h>
 #include <Storages/Transaction/TiDB.h>
 #include <Storages/Transaction/Types.h>
@@ -90,6 +94,7 @@ extern const int DISAGG_ESTABLISH_RETRYABLE_ERROR;
 
 BlockInputStreams StorageDisaggregated::readFromWriteNode(
     const Context & db_context,
+    const SelectQueryInfo & query_info,
     unsigned num_streams)
 {
     auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
@@ -145,7 +150,7 @@ BlockInputStreams StorageDisaggregated::readFromWriteNode(
 
     // Build InputStream according to the remote segment read tasks
     DAGPipeline pipeline;
-    buildRemoteSegmentInputStreams(db_context, remote_read_tasks, num_streams, pipeline);
+    buildRemoteSegmentInputStreams(db_context, remote_read_tasks, query_info, num_streams, pipeline);
     NamesAndTypes source_columns = genNamesAndTypesForExchangeReceiver(table_scan);
     filterConditions(std::move(source_columns), pipeline);
     return pipeline.streams;
@@ -442,9 +447,8 @@ DM::RSOperatorPtr StorageDisaggregated::buildRSOperator(
 
     auto dag_query = std::make_unique<DAGQueryInfo>(
         filter_conditions.conditions,
-        google::protobuf::RepeatedPtrField<tipb::Expr>{}, // Not care now
-        DAGPreparedSets{}, // Not care now
-        NamesAndTypes{}, // Not care now
+        table_scan.getPushedDownFilters(),
+        table_scan.getColumns(),
         db_context.getTimezoneInfo());
     auto create_attr_by_column_id = [defines = columns_to_read](ColumnID column_id) -> DM::Attr {
         auto iter = std::find_if(
@@ -464,6 +468,7 @@ DM::RSOperatorPtr StorageDisaggregated::buildRSOperator(
 void StorageDisaggregated::buildRemoteSegmentInputStreams(
     const Context & db_context,
     const DM::RNRemoteReadTaskPtr & remote_read_tasks,
+    const SelectQueryInfo &,
     size_t num_streams,
     DAGPipeline & pipeline)
 {
@@ -500,6 +505,14 @@ void StorageDisaggregated::buildRemoteSegmentInputStreams(
     pipeline.streams.reserve(num_streams);
 
     auto rs_operator = buildRSOperator(db_context, column_defines);
+    auto push_down_filter = StorageDeltaMerge::buildPushDownFilter(
+        rs_operator,
+        table_scan.getColumns(),
+        table_scan.getPushedDownFilters(),
+        *column_defines,
+        db_context,
+        log);
+    auto read_mode = DM::DeltaMergeStore::getReadMode(db_context, table_scan.isFastScan(), table_scan.keepOrder(), push_down_filter);
 
     auto sub_streams_size = io_concurrency / num_streams;
     for (size_t stream_idx = 0; stream_idx < num_streams; ++stream_idx)
@@ -515,9 +528,10 @@ void StorageDisaggregated::buildRemoteSegmentInputStreams(
             read_tso,
             sub_streams_size,
             extra_table_id_index,
-            rs_operator,
+            push_down_filter,
             extra_info,
-            /*tracing_id*/ log->identifier());
+            /*tracing_id*/ log->identifier(),
+            read_mode);
         RUNTIME_CHECK(!sub_streams.empty(), sub_streams.size(), sub_streams_size);
 
         auto union_stream = std::make_shared<UnionBlockInputStream<>>(sub_streams, BlockInputStreams{}, sub_streams_size, /*req_id=*/"");

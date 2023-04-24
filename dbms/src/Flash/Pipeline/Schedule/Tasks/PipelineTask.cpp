@@ -29,13 +29,13 @@ PipelineTask::PipelineTask(
     : EventTask(std::move(mem_tracker_), req_id, exec_status_, event_)
     , pipeline_exec(std::move(pipeline_exec_))
 {
-    assert(pipeline_exec);
+    RUNTIME_CHECK(pipeline_exec);
     pipeline_exec->executePrefix();
 }
 
 void PipelineTask::finalizeImpl()
 {
-    assert(pipeline_exec);
+    RUNTIME_CHECK(pipeline_exec);
     pipeline_exec->executeSuffix();
     pipeline_exec.reset();
 }
@@ -66,7 +66,7 @@ ExecTaskStatus PipelineTask::doExecuteImpl()
     auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
     auto scope = GlobalTracer::get()->WithActiveSpan(span);
 
-    assert(pipeline_exec);
+    RUNTIME_CHECK(pipeline_exec);
     auto op_status = pipeline_exec->execute();
     switch (op_status)
     {
@@ -82,7 +82,7 @@ ExecTaskStatus PipelineTask::doExecuteImpl()
 
 ExecTaskStatus PipelineTask::doExecuteIOImpl()
 {
-    assert(pipeline_exec);
+    RUNTIME_CHECK(pipeline_exec);
     auto op_status = pipeline_exec->executeIO();
     switch (op_status)
     {
@@ -101,7 +101,7 @@ ExecTaskStatus PipelineTask::doExecuteIOImpl()
 
 ExecTaskStatus PipelineTask::doAwaitImpl()
 {
-    assert(pipeline_exec);
+    RUNTIME_CHECK(pipeline_exec);
     auto op_status = pipeline_exec->await();
     switch (op_status)
     {

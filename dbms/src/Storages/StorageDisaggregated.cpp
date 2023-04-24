@@ -42,7 +42,7 @@ StorageDisaggregated::StorageDisaggregated(
 
 BlockInputStreams StorageDisaggregated::read(
     const Names &,
-    const SelectQueryInfo &,
+    const SelectQueryInfo & query_info,
     const Context & db_context,
     QueryProcessingStage::Enum &,
     size_t,
@@ -55,7 +55,7 @@ BlockInputStreams StorageDisaggregated::read(
     /// data from S3.
     bool remote_data_read = S3::ClientFactory::instance().isEnabled();
     if (remote_data_read)
-        return readFromWriteNode(db_context, num_streams);
+        return readFromWriteNode(db_context, query_info, num_streams);
 
     /// Fetch all data from write node through MPP exchange sender/receiver
 
