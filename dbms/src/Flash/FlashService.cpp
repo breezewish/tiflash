@@ -375,7 +375,7 @@ static grpc::Status CheckMppVersionForEstablishMPPConnection(const mpp::Establis
 grpc::Status AsyncFlashService::establishMPPConnectionAsync(EstablishCallData * call_data)
 {
     LOG_INFO(Logger::get(), "Wenxuan: Handle AsyncFlashService::establishMPPConnectionAsync");
-    auto scope = GrpcTracer::getScopeFromGrpcContext(grpc_context);
+    auto scope = GrpcTracer::getScopeFromGrpcContext(call_data->getGrpcContext());
 
     CPUAffinityManager::getInstance().bindSelfGrpcThread();
     // Establish a pipe for data transferring. The pipes have registered by the task in advance.
