@@ -99,16 +99,22 @@ void PosixRandomAccessFile::close()
 
 off_t PosixRandomAccessFile::seek(off_t offset, int whence)
 {
-    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
-    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+    auto d_span = GlobalTracer::startDeferredSpan();
+    SCOPE_EXIT({
+        if (d_span.elapsedMillis() > 5)
+            d_span.commit(__PRETTY_FUNCTION__);
+    });
 
     return ::lseek(fd, offset, whence);
 }
 
 ssize_t PosixRandomAccessFile::read(char * buf, size_t size)
 {
-    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
-    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+    auto d_span = GlobalTracer::startDeferredSpan();
+    SCOPE_EXIT({
+        if (d_span.elapsedMillis() > 5)
+            d_span.commit(__PRETTY_FUNCTION__);
+    });
 
     if (read_limiter != nullptr)
     {
@@ -123,8 +129,11 @@ ssize_t PosixRandomAccessFile::read(char * buf, size_t size)
 
 ssize_t PosixRandomAccessFile::pread(char * buf, size_t size, off_t offset) const
 {
-    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
-    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+    auto d_span = GlobalTracer::startDeferredSpan();
+    SCOPE_EXIT({
+        if (d_span.elapsedMillis() > 5)
+            d_span.commit(__PRETTY_FUNCTION__);
+    });
 
     if (read_limiter != nullptr)
     {

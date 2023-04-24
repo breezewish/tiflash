@@ -16,9 +16,11 @@
 
 #include <Common/Exception.h>
 #include <Common/SimpleIntrusiveNode.h>
+#include <Common/Tracer.h>
 #include <Common/nocopyable.h>
 #include <common/defines.h>
 #include <common/types.h>
+#include <opentelemetry/trace/span_startoptions.h>
 
 #include <atomic>
 #include <chrono>
@@ -306,12 +308,17 @@ private:
 
         if constexpr (need_wait)
         {
+            auto d_span = GlobalTracer::startDeferredSpan();
+
             /// read_pos < write_pos means the queue isn't empty
             auto pred = [&] {
                 return read_pos < write_pos || !isNormal();
             };
             if (!wait(lock, reader_head, node, pred, deadline))
                 is_timeout = true;
+
+            if (d_span.elapsedMillis() > 5)
+                d_span.commit("MPMCQueue::popObj_wait");
         }
         /// double check status after potential wait
         if (!isCancelled() && read_pos < write_pos)
@@ -367,11 +374,16 @@ private:
 
         if constexpr (need_wait)
         {
+            auto d_span = GlobalTracer::startDeferredSpan();
+
             auto pred = [&] {
                 return (write_pos - read_pos < capacity && current_auxiliary_memory_usage < max_auxiliary_memory_usage) || !isNormal();
             };
             if (!wait(lock, writer_head, node, pred, deadline))
                 is_timeout = true;
+
+            if (d_span.elapsedMillis() > 5)
+                d_span.commit("MPMCQueue::pushObj_wait");
         }
 
         /// double check status after potential wait

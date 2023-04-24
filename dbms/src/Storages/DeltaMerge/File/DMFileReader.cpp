@@ -663,8 +663,11 @@ void DMFileReader::readFromDisk(
     size_t skip_packs,
     bool force_seek)
 {
-    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
-    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+    auto d_span = GlobalTracer::startDeferredSpan();
+    SCOPE_EXIT({
+        if (d_span.elapsedMillis() > 5)
+            d_span.commit(__PRETTY_FUNCTION__);
+    });
 
     const auto stream_name = DMFile::getFileNameBase(column_define.id);
     if (auto iter = column_streams.find(stream_name); iter != column_streams.end())

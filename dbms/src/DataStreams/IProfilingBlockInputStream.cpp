@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Common/Tracer.h>
 #include <DataStreams/IProfilingBlockInputStream.h>
 #include <Interpreters/ProcessList.h>
 #include <Interpreters/Quota.h>
@@ -45,6 +46,14 @@ Block IProfilingBlockInputStream::read()
 
 Block IProfilingBlockInputStream::read(FilterPtr & res_filter, bool return_filter)
 {
+    // FmtBuffer pipeline;
+    // dumpTree(pipeline);
+
+    // auto span = GlobalTracer::get()->StartSpan(
+    //     fmt::format("IProfilingBlockInputStream<{}>::read {}", getName(), extra_info),
+    //     {{"pipeline", pipeline.toString()}});
+    // auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     if (total_rows_approx)
     {
         progressImpl(Progress(0, 0, total_rows_approx));

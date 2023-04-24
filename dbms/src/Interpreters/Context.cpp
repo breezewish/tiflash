@@ -20,6 +20,7 @@
 #include <Common/Stopwatch.h>
 #include <Common/TiFlashMetrics.h>
 #include <Common/TiFlashSecurity.h>
+#include <Common/Tracer.h>
 #include <Common/escapeForFileName.h>
 #include <Common/formatReadable.h>
 #include <Common/randomSeed.h>
@@ -1101,6 +1102,9 @@ void Context::setSetting(const String & name, const Field & value)
 
 void Context::setSetting(const String & name, const std::string & value)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     if (name == "profile")
     {
         auto lock = getLock();

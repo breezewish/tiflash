@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <Common/Exception.h>
+#include <Common/Tracer.h>
 #include <Flash/Pipeline/Schedule/Tasks/PipelineTask.h>
 
 #include <magic_enum.hpp>
@@ -62,6 +63,9 @@ void PipelineTask::finalizeImpl()
 
 ExecTaskStatus PipelineTask::doExecuteImpl()
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     assert(pipeline_exec);
     auto op_status = pipeline_exec->execute();
     switch (op_status)

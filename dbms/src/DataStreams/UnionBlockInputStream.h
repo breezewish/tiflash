@@ -218,8 +218,8 @@ protected:
 
     Block readImpl() override
     {
-        auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
-        auto scope = GlobalTracer::get()->WithActiveSpan(span);
+        // auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+        // auto scope = GlobalTracer::get()->WithActiveSpan(span);
 
         if (all_read)
             return received_payload.block;

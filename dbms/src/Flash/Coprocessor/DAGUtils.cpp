@@ -14,6 +14,7 @@
 
 #include <Common/FmtUtils.h>
 #include <Common/TiFlashException.h>
+#include <Common/Tracer.h>
 #include <Core/Types.h>
 #include <DataTypes/DataTypeNullable.h>
 #include <DataTypes/FieldToDataType.h>
@@ -1442,6 +1443,9 @@ void assertBlockSchema(
 
 tipb::DAGRequest getDAGRequestFromStringWithRetry(const String & s)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     tipb::DAGRequest dag_req;
     if (!dag_req.ParseFromString(s))
     {

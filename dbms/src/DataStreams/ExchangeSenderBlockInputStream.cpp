@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <Common/FailPoint.h>
+#include <Common/Tracer.h>
 #include <DataStreams/ExchangeSenderBlockInputStream.h>
 #include <Flash/Coprocessor/DAGContext.h>
 
@@ -27,6 +28,9 @@ extern const char exception_during_mpp_root_task_run[];
 
 Block ExchangeSenderBlockInputStream::readImpl()
 {
+    // auto span = GlobalTracer::get()->StartSpan(fmt::format("ExchangeSenderBlockInputStream::readImpl (child={})", children.back()->getName()));
+    // auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     FAIL_POINT_PAUSE(FailPoints::hang_in_execution);
     if (writer->dagContext().isRootMPPTask())
     {

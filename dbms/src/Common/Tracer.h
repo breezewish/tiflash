@@ -17,11 +17,36 @@
 #include <opentelemetry/trace/noop.h>
 #include <opentelemetry/trace/tracer.h>
 
+#include <chrono>
+
 namespace DB
 {
 
 using Tracer = opentelemetry::trace::Tracer;
 using TracerPtr = std::shared_ptr<Tracer>;
+
+class DeferredSpan
+{
+    friend class GlobalTracer;
+
+public:
+    int elapsedMillis() const
+    {
+        auto now = std::chrono::steady_clock::now();
+        return std::chrono::duration_cast<std::chrono::milliseconds>(now - start_tick).count();
+    }
+
+    void commit(
+        std::string_view name,
+        std::initializer_list<std::pair<std::string_view, opentelemetry::common::AttributeValue>> attributes = {}) const;
+
+private:
+    DeferredSpan() = default;
+
+    std::chrono::system_clock::time_point start_ts = std::chrono::system_clock::now();
+    std::chrono::steady_clock::time_point start_tick = std::chrono::steady_clock::now();
+    std::shared_ptr<opentelemetry::trace::Span> span;
+};
 
 class GlobalTracer
 {
@@ -33,6 +58,14 @@ public:
     static TracerPtr get()
     {
         return instance;
+    }
+
+    /// Deferred span means it is not really started here, only its time is recorded.
+    /// We can decide whether the span should be kept later.
+    /// A deferred span does not have scope.
+    static DeferredSpan startDeferredSpan()
+    {
+        return DeferredSpan{};
     }
 };
 

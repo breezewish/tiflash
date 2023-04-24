@@ -193,9 +193,16 @@ private:
         auto propagator = opentelemetry::context::propagation::GlobalTextMapPropagator::GetGlobalPropagator();
         auto current_ctx = opentelemetry::context::RuntimeContext::GetCurrent();
         auto new_context = propagator->Extract(carrier, current_ctx);
+        auto parent_context = opentelemetry::trace::GetSpan(new_context)->GetContext();
         opentelemetry::trace::StartSpanOptions options;
         options.kind = opentelemetry::trace::SpanKind::kServer;
-        options.parent = opentelemetry::trace::GetSpan(new_context)->GetContext();
+        options.parent = parent_context;
+
+        char trace_id[32] = {0};
+        char span_id[16] = {0};
+        parent_context.trace_id().ToLowerBase16(trace_id);
+        parent_context.span_id().ToLowerBase16(span_id);
+        LOG_INFO(Logger::get(), "Parent Trace={} Span={}", String(trace_id, 32), String(span_id, 16));
 
         // Trace ctx is alive within this RPC call.
         trace_ctx = std::make_unique<GrpcTraceContext>();

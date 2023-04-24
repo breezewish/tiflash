@@ -212,6 +212,9 @@ protected:
         }
     }
 
+    /// The info that hints why the inputStream is needed to run.
+    String extra_info;
+
 protected:
     BlockInputStreams children;
     mutable std::shared_mutex children_mutex;
@@ -226,8 +229,6 @@ private:
     mutable std::mutex tree_id_mutex;
     mutable String tree_id;
 
-    /// The info that hints why the inputStream is needed to run.
-    String extra_info;
 
     /// Get text with names of this source and the entire subtree, this function should only be called after the
     /// InputStream tree is constructed.

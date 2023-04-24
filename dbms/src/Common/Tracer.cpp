@@ -25,4 +25,21 @@ void GlobalTracer::init()
     instance = tracer;
 }
 
+void DeferredSpan::commit(
+    std::string_view name,
+    std::initializer_list<std::pair<std::string_view, opentelemetry::common::AttributeValue>> attributes) const
+{
+    auto now = std::chrono::steady_clock::now();
+    auto span = GlobalTracer::get()->StartSpan(
+        name,
+        attributes,
+        opentelemetry::trace::StartSpanOptions{
+            .start_system_time = start_ts,
+            .start_steady_time = start_tick,
+        });
+    span->End({
+        .end_steady_time = now,
+    });
+}
+
 } // namespace DB

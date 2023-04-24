@@ -146,10 +146,13 @@ void RNPageReceiverBase<RPCContext>::close()
 template <typename RPCContext>
 void RNPageReceiverBase<RPCContext>::setUpConnection()
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+
     // TODO: support async
     for (size_t index = 0; index < source_num; ++index)
     {
-        thread_manager->schedule(true, "Receiver", [this] {
+        thread_manager->schedule(true, "Receiver", [this, span]() mutable {
+            auto scope2 = GlobalTracer::get()->WithActiveSpan(span);
             readLoop();
         });
         ++thread_count;
@@ -259,6 +262,9 @@ constexpr Int32 max_retry_times = 10;
 template <typename RPCContext>
 void RNPageReceiverBase<RPCContext>::readLoop()
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     // TODO: metrics
 
     CPUAffinityManager::getInstance().bindSelfQueryThread();

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <Common/FailPoint.h>
+#include <Common/Tracer.h>
 #include <Flash/Pipeline/Schedule/Tasks/EventTask.h>
 
 namespace DB
@@ -81,6 +82,9 @@ ExecTaskStatus EventTask::awaitImpl() noexcept
 
 ExecTaskStatus EventTask::doTaskAction(std::function<ExecTaskStatus()> && action)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     if (unlikely(exec_status.isCancelled()))
     {
         finalize();

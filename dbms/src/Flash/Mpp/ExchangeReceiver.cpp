@@ -529,7 +529,11 @@ void ExchangeReceiverBase<RPCContext>::setUpLocalConnections(std::vector<Request
 template <typename RPCContext>
 void ExchangeReceiverBase<RPCContext>::setUpConnectionWithReadLoop(Request && req)
 {
-    thread_manager->schedule(true, "Receiver", [this, req = std::move(req)] {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+
+    thread_manager->schedule(true, "Receiver", [this, req = std::move(req), span]() mutable {
+        auto scope2 = GlobalTracer::get()->WithActiveSpan(span);
+
         if (enable_fine_grained_shuffle_flag)
             readLoop<true>(req);
         else
@@ -587,6 +591,9 @@ template <typename RPCContext>
 template <bool enable_fine_grained_shuffle>
 void ExchangeReceiverBase<RPCContext>::readLoop(const Request & req)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     GET_METRIC(tiflash_thread_count, type_threads_of_receiver_read_loop).Increment();
     SCOPE_EXIT({
         GET_METRIC(tiflash_thread_count, type_threads_of_receiver_read_loop).Decrement();

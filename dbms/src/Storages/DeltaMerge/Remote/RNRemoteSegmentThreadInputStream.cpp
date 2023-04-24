@@ -106,6 +106,9 @@ RNRemoteSegmentThreadInputStream::~RNRemoteSegmentThreadInputStream()
 
 Block RNRemoteSegmentThreadInputStream::readImpl(FilterPtr & res_filter, bool return_filter)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     if (done)
         return {};
     while (true)

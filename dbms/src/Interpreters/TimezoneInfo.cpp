@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Common/Tracer.h>
 #include <Interpreters/TimezoneInfo.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -40,6 +41,9 @@ void TimezoneInfo::resetByTimezoneOffset(Int64 offset)
 
 void TimezoneInfo::resetByDAGRequest(const tipb::DAGRequest & rqst)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     if (rqst.has_time_zone_name() && !rqst.time_zone_name().empty())
     {
         // dag request use name based timezone info

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <Common/FailPoint.h>
+#include <Common/Tracer.h>
 #include <Flash/Coprocessor/TablesRegionsInfo.h>
 #include <Flash/CoprocessorHandler.h>
 #include <Interpreters/Context.h>
@@ -98,6 +99,9 @@ TablesRegionsInfo TablesRegionsInfo::create(
     const google::protobuf::RepeatedPtrField<coprocessor::TableRegions> & table_regions,
     const TMTContext & tmt_context)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     assert(regions.empty() || table_regions.empty());
     TablesRegionsInfo tables_regions_info(!regions.empty());
     std::unordered_set<RegionID> local_region_id_set;

@@ -15,6 +15,7 @@
 #pragma once
 
 #include <Common/FmtUtils.h>
+#include <Common/Tracer.h>
 #include <DataStreams/IProfilingBlockInputStream.h>
 #include <Flash/Coprocessor/CHBlockChunkCodec.h>
 #include <Flash/Coprocessor/ChunkDecodeAndSquash.h>
@@ -64,6 +65,9 @@ class TiRemoteBlockInputStream : public IProfilingBlockInputStream
 
     bool fetchRemoteResult()
     {
+        auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+        auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
         while (true)
         {
             auto result = remote_reader->nextResult(block_queue, sample_block, stream_id, decoder_ptr);

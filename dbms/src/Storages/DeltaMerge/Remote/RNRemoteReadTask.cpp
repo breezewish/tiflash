@@ -244,6 +244,12 @@ RNRemoteSegmentReadTaskPtr RNRemoteReadTask::nextTaskForPrepare()
 
 RNRemoteSegmentReadTaskPtr RNRemoteReadTask::nextReadyTask()
 {
+    auto d_span = GlobalTracer::startDeferredSpan();
+    SCOPE_EXIT({
+        if (d_span.elapsedMillis() > 5)
+            d_span.commit("wait nextReadyTask");
+    });
+
     std::unique_lock ready_lock(mtx_ready_tasks);
     RNRemoteSegmentReadTaskPtr seg_task = nullptr;
     cv_ready_tasks.wait(ready_lock, [this, &seg_task] {
@@ -571,6 +577,9 @@ BlockInputStreamPtr RNRemoteSegmentReadTask::getInputStream(
     const DM::RSOperatorPtr & rs_filter,
     size_t expected_block_size)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     return segment->getInputStreamModeNormal(
         *dm_context,
         columns_to_read,

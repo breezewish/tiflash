@@ -123,7 +123,7 @@ public:
     void process()
     {
         auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
-        auto scope = GlobalTracer::get()->WithActiveSpan(span);
+        // auto scope = GlobalTracer::get()->WithActiveSpan(span);
 
         if (!thread_manager)
             thread_manager = newThreadManager();
@@ -313,9 +313,6 @@ private:
         // an exception occurred then the queue was cancelled.
         while (work.available_inputs.pop(input) == MPMCQueueResult::OK)
         {
-            auto span = GlobalTracer::get()->StartSpan("input.in->read");
-            auto scope = GlobalTracer::get()->WithActiveSpan(span);
-
             /// The main work.
             Block block = input.in->read();
 

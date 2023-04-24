@@ -18,6 +18,7 @@
 #include <Common/MPMCQueue.h>
 #include <Common/ThreadFactory.h>
 #include <Common/ThreadManager.h>
+#include <Common/Tracer.h>
 #include <Common/typeid_cast.h>
 #include <DataStreams/IProfilingBlockInputStream.h>
 
@@ -69,10 +70,16 @@ public:
 
         if (read_prefixed)
             return;
+
+        auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+
         read_prefixed = true;
         /// Start reading thread.
         thread_manager = newThreadManager();
-        thread_manager->schedule(true, "SharedQuery", [this] { fetchBlocks(); });
+        thread_manager->schedule(true, "SharedQuery", [this, span]() mutable {
+            auto scope2 = GlobalTracer::get()->WithActiveSpan(span);
+            fetchBlocks();
+        });
     }
 
     void readSuffix() override
@@ -144,6 +151,9 @@ protected:
 
     void fetchBlocks()
     {
+        auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+        auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
         try
         {
             in->readPrefix();

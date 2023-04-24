@@ -528,9 +528,6 @@ bool Region::checkIndex(UInt64 index) const
 
 std::tuple<WaitIndexResult, double> Region::waitIndex(UInt64 index, const UInt64 timeout_ms, std::function<bool(void)> && check_running)
 {
-    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
-    auto scope = GlobalTracer::get()->WithActiveSpan(span);
-
     if (proxy_helper != nullptr)
     {
         if (!meta.checkIndex(index))
