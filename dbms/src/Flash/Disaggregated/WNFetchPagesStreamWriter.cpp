@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <Common/Exception.h>
+#include <Common/Tracer.h>
 #include <Flash/Coprocessor/CHBlockChunkCodec.h>
 #include <Flash/Disaggregated/WNFetchPagesStreamWriter.h>
 #include <Interpreters/SharedContexts/Disagg.h>
@@ -45,6 +46,9 @@ WNFetchPagesStreamWriterPtr WNFetchPagesStreamWriter::build(
 
 disaggregated::PagesPacket WNFetchPagesStreamWriter::nextPacket()
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     // TODO: the returned rows should respect max_rows_per_chunk
 
     disaggregated::PagesPacket packet;

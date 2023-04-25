@@ -420,6 +420,7 @@ public:
     {
         if (std::strcmp(info->method(), "/tikvpb.Tikv/KvGet") == 0 //
             || std::strcmp(info->method(), "/tikvpb.Tikv/KvScan") == 0 //
+            || std::strcmp(info->method(), "/tikvpb.Tikv/IsAlive") == 0 //
         )
         {
             // Skip these RPC calls.

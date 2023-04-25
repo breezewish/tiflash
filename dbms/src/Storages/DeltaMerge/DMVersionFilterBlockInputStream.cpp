@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Common/Tracer.h>
 #include <Storages/DeltaMerge/DMVersionFilterBlockInputStream.h>
 
 namespace ProfileEvents
@@ -44,6 +45,9 @@ void DMVersionFilterBlockInputStream<MODE>::readSuffix()
 template <int MODE>
 Block DMVersionFilterBlockInputStream<MODE>::read(FilterPtr & res_filter, bool return_filter)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     while (true)
     {
         if (!raw_block)

@@ -1102,9 +1102,6 @@ void Context::setSetting(const String & name, const Field & value)
 
 void Context::setSetting(const String & name, const std::string & value)
 {
-    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
-    auto scope = GlobalTracer::get()->WithActiveSpan(span);
-
     if (name == "profile")
     {
         auto lock = getLock();

@@ -2125,6 +2125,9 @@ Segment::ReadInfo Segment::getReadInfo(const DMContext & dm_context,
                                        const RowKeyRanges & read_ranges,
                                        UInt64 max_version) const
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     auto tracing_logger = log->getChild(dm_context.tracing_id);
     LOG_DEBUG(tracing_logger, "Begin segment getReadInfo");
 

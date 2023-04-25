@@ -44,6 +44,8 @@ RNPagePreparer::RNPagePreparer(
     , total_pages(0)
     , exc_log(Logger::get(req_id, executor_id))
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+
     assert(columns_to_read != nullptr);
     decoder_ptr = std::make_unique<CHBlockChunkCodec>(DM::toEmptyBlock(*columns_to_read));
 
@@ -51,7 +53,9 @@ RNPagePreparer::RNPagePreparer(
     {
         for (size_t index = 0; index < threads_num; ++index)
         {
-            auto task = std::make_shared<std::packaged_task<void()>>([this, index] {
+            auto task = std::make_shared<std::packaged_task<void()>>([this, index, span]() mutable {
+                auto scope2 = GlobalTracer::get()->WithActiveSpan(span);
+
                 try
                 {
                     prepareLoop(index);
@@ -92,7 +96,6 @@ RNPagePreparer::~RNPagePreparer() noexcept
 void RNPagePreparer::prepareLoop(size_t idx)
 {
     LoggerPtr log = exc_log->getChild(fmt::format("PagePrepareThread#{}", idx));
-
 
     bool meet_error = false;
     String local_err_msg;
