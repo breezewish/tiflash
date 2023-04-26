@@ -13,6 +13,7 @@
 // limitations under the License.
 #pragma once
 
+#include <Common/Tracer.h>
 #include <stdint.h>
 
 #include <cassert>
@@ -75,10 +76,15 @@ public:
     {
         {
             std::unique_lock<std::mutex> lock(mu);
+
+            auto d_span = GlobalTracer::startDeferredSpan();
             while (full() && !done)
             {
                 writer_cv.wait(lock);
             }
+            if (d_span.elapsedMillis() > 5)
+                d_span.commit("wait ReadPool::Queue::push");
+
             if (done)
             {
                 return false;
@@ -107,11 +113,16 @@ public:
         {
             std::unique_lock<std::mutex> lock(mu);
             ++pop_times;
+
+            auto d_span = GlobalTracer::startDeferredSpan();
             while (queue.empty() && !done)
             {
                 ++pop_empty_times;
                 reader_cv.wait(lock);
             }
+            if (d_span.elapsedMillis() > 5)
+                d_span.commit("wait ReadPool::Queue::pop");
+
             if (queue.empty())
             {
                 assert(done);
@@ -130,7 +141,7 @@ public:
    *
    * @param[out] item  If `tryPop` returns `true`, it contains the popped item or is modified
    *                    if `tryPop` returns `false`, it is unmodified
-   * @returns          True upon success or `finish()` has been called. 
+   * @returns          True upon success or `finish()` has been called.
    *                    False if the queue is empty
    */
     bool tryPop(T & item)

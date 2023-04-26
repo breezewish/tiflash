@@ -246,6 +246,9 @@ private:
 
     void publishPayload(BlockInputStreamPtr & stream, Block & block, size_t thread_num)
     {
+        auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+        auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
         if constexpr (mode == StreamUnionMode::Basic)
             handler.onBlock(block, thread_num);
         else
@@ -313,6 +316,17 @@ private:
         // an exception occurred then the queue was cancelled.
         while (work.available_inputs.pop(input) == MPMCQueueResult::OK)
         {
+            auto span = GlobalTracer::get()->StartSpan("Read input");
+            // span->SetAttribute("child", input.in->getName());
+            // auto pipeline_log_str = [&input]() {
+            //     FmtBuffer log_buffer;
+            //     log_buffer.append("Query pipeline:\n");
+            //     input.in->dumpTree(log_buffer);
+            //     return log_buffer.toString();
+            // };
+            // span->SetAttribute("tree", pipeline_log_str());
+            auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
             /// The main work.
             Block block = input.in->read();
 

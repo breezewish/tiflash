@@ -28,8 +28,8 @@ extern const char exception_during_mpp_root_task_run[];
 
 Block ExchangeSenderBlockInputStream::readImpl()
 {
-    // auto span = GlobalTracer::get()->StartSpan(fmt::format("ExchangeSenderBlockInputStream::readImpl (child={})", children.back()->getName()));
-    // auto scope = GlobalTracer::get()->WithActiveSpan(span);
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
 
     FAIL_POINT_PAUSE(FailPoints::hang_in_execution);
     if (writer->dagContext().isRootMPPTask())

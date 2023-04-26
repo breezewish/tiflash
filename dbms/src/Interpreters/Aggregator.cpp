@@ -17,6 +17,7 @@
 #include <Common/FailPoint.h>
 #include <Common/Stopwatch.h>
 #include <Common/ThresholdUtils.h>
+#include <Common/Tracer.h>
 #include <Common/typeid_cast.h>
 #include <DataStreams/materializeBlock.h>
 #include <DataTypes/DataTypeAggregateFunction.h>
@@ -735,6 +736,9 @@ bool Aggregator::executeOnBlock(
     ColumnRawPtrs & key_columns,
     AggregateColumns & aggregate_columns)
 {
+    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+    auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
     assert(!result.need_spill);
 
     if (is_cancelled())

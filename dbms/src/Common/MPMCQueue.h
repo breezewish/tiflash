@@ -318,7 +318,7 @@ private:
                 is_timeout = true;
 
             if (d_span.elapsedMillis() > 5)
-                d_span.commit("MPMCQueue::popObj_wait");
+                d_span.commit("wait MPMCQueue::pop");
         }
         /// double check status after potential wait
         if (!isCancelled() && read_pos < write_pos)
@@ -383,7 +383,7 @@ private:
                 is_timeout = true;
 
             if (d_span.elapsedMillis() > 5)
-                d_span.commit("MPMCQueue::pushObj_wait");
+                d_span.commit("wait MPMCQueue::push");
         }
 
         /// double check status after potential wait

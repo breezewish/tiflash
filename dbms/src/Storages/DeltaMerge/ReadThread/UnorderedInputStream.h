@@ -15,6 +15,7 @@
 #pragma once
 
 #include <Common/FailPoint.h>
+#include <Common/Tracer.h>
 #include <DataStreams/IProfilingBlockInputStream.h>
 #include <DataStreams/SegmentReadTransformAction.h>
 #include <Storages/DeltaMerge/ReadThread/SegmentReadTaskScheduler.h>
@@ -76,6 +77,9 @@ protected:
     // Currently, res_filter and return_filter is unused.
     Block readImpl(FilterPtr & /*res_filter*/, bool /*return_filter*/) override
     {
+        auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
+        auto scope = GlobalTracer::get()->WithActiveSpan(span);
+
         if (done)
         {
             return {};

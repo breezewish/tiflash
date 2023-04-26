@@ -14,6 +14,7 @@
 
 #include <Common/Exception.h>
 #include <Common/FailPoint.h>
+#include <Common/StackTrace.h>
 #include <Common/TiFlashMetrics.h>
 #include <Common/Tracer.h>
 #include <Flash/EstablishCall.h>
@@ -158,10 +159,7 @@ void MPPTunnel::close(const String & reason, bool wait_sender_finish)
 
 void MPPTunnel::write(TrackedMppDataPacketPtr && data)
 {
-    auto span = GlobalTracer::get()->StartSpan(__PRETTY_FUNCTION__);
-    auto scope = GlobalTracer::get()->WithActiveSpan(span);
-
-    LOG_TRACE(log, "ready to write");
+    // LOG_INFO(log, "MPPTunnel::write, stack={}", StackTrace().toString());
     {
         std::unique_lock lk(mu);
         waitUntilConnectedOrFinished(lk);

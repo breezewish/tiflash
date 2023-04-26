@@ -977,7 +977,7 @@ void initOpenTelemetry(Poco::Util::LayeredConfiguration & config)
 
     auto processor_otlp = BatchSpanProcessorFactory::Create(
         std::move(exporter_otlp),
-        {});
+        {.schedule_delay_millis = std::chrono::milliseconds(1000)});
 
     // auto exporter_log = std::make_unique<LogSpanExporter>();
 

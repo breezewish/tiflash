@@ -57,6 +57,12 @@ clean-cmake:
 	rm -rf ../cmake-build-Debug/CMakeCache.txt
 	rm -rf ../cmake-build-Release/CMakeCache.txt
 
+.PHONY: pack-release
+pack-release:
+	mkdir -p ../cmake-build-Release/package/tiflash
+	cp ../cmake-build-Release/artifacts/* ../cmake-build-Release/package/tiflash
+	cd ../cmake-build-Release/package && tar czf ../packed-tiflash.tar.gz *
+
 .PHONY: shell
 shell:
 	$(CONTAINER_SHELL)
