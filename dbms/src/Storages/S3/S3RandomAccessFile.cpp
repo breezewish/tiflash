@@ -23,6 +23,7 @@
 #include <Storages/S3/S3Common.h>
 #include <Storages/S3/S3Filename.h>
 #include <Storages/S3/S3RandomAccessFile.h>
+#include <Storages/S3/S3Recorder.h>
 #include <aws/s3/model/GetObjectRequest.h>
 
 #include <chrono>
@@ -201,12 +202,18 @@ bool S3RandomAccessFile::initialize()
         {
             ProfileEvents::increment(ProfileEvents::S3GetObjectRetry);
         }
+
+        auto start_at = std::chrono::system_clock::now();
+        Stopwatch sw_getobj;
         auto outcome = client_ptr->GetObject(req);
+
         if (!outcome.IsSuccess())
         {
             LOG_ERROR(log, "S3 GetObject failed: {}, cur_retry={}", S3::S3ErrorMessage(outcome.GetError()), cur_retry);
             continue;
         }
+
+        S3Recorder::global_recorder->record(req, start_at, sw_getobj.elapsedSeconds());
 
         request_succ = true;
         if (content_length == 0)
